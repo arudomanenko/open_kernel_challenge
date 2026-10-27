@@ -1,0 +1,56 @@
+{
+  "job": "86e5f6c3e21d41eb",
+  "mode": "run",
+  "speedup": 1.2202421059743995,
+  "speedup_ci": [
+    1.2019384743847836,
+    1.2385457375640154
+  ],
+  "score_us": 3958.8864999396683,
+  "baseline_step_us": 4830.8,
+  "gpu": "H200",
+  "machine": {
+    "gpu_after": {
+      "clocks.max.sm": 1980,
+      "clocks.mem": 3201,
+      "clocks.sm": 1980,
+      "driver_version": "580.159.03",
+      "name": "NVIDIA H200",
+      "power.draw": 119.47,
+      "power.limit": 700,
+      "temperature.gpu": 31
+    },
+    "gpu_before": {
+      "clocks.max.sm": 1980,
+      "clocks.mem": 3201,
+      "clocks.sm": 1980,
+      "driver_version": "580.159.03",
+      "name": "NVIDIA H200",
+      "power.draw": 126.72,
+      "power.limit": 700,
+      "temperature.gpu": 33
+    },
+    "node": "n-djsogg5ih26gwdcnhyhbnqzfkb"
+  },
+  "evaluator": {
+    "code_sha256": "986ed3ebb096eab83d16797609f4c0e7895248d6bce33252d25dd306cbe5d018",
+    "files": {
+      "challenge/checks.py": "9a046c3c38db28b325dcd1557baecdf6bc9ef941d2175f9a900ba4c230bb8055",
+      "challenge/nvfp4.py": "cfdf37c7bc14b10f7353aba7d4632f4767401b92b4b073941a8030d9a961aaaf",
+      "configs/muse-spark-open.yaml": "98f07230e4e64fe91b7c76d9a3ce04948053c043d494d5f1fae56cfe2de033af",
+      "harness/eval.py": "0051a1bfac67a9f1fad06086b306653c6643b2bb253e15a794aa672312f070a9",
+      "harness/runner.py": "c905e5c80264c6d27620b6fc7d55b162dccdb8ed7282f8a513a4d2e6f2f226f2",
+      "harness/static_checks.py": "c5588b69e9e86229459a525c61b30096f6f13ff2add6cadf98f272c4ac8ca0c2",
+      "harness/worker.py": "950437610f57ddffbc1176b65d9c2ae909c47bf67b1e3fe0716a81946986f568",
+      "problems/muse_bf16_proj/baseline.py": "39f52ea5b65505958aa9dee9c8129dd394cbba4e670046f862b5a88ce91a0574",
+      "problems/muse_bf16_proj/reference.py": "e62491abc9ddcad33f5faba8b0ee74cf6370b7be5dd2dc05031742f3ebf7147d",
+      "problems/muse_bf16_proj/task.yml": "18e9da6357144b0a1348434a18bd2d1938b1948d9f2130876f6b6706588470c9"
+    },
+    "image": "localhost:30500/kc/judge@sha256:9a7f287b80d772c6f636bbcb57422c619fe326e2aabc53803b85007bca93f68e"
+  },
+  "passed_tests": 9,
+  "passed_scored_cases": 30,
+  "submission_sha256": "9f87ee5344c4507e9161cbe3784972f8cdfd0f9c90ace6d692cdfdd5deffe269",
+  "service_content_hash": "2842f95505e1429ab4a9f9ed0ff5fa7eadf4f020d4734c38518cf915eac03efc",
+  "submission_bytes": 9474
+}

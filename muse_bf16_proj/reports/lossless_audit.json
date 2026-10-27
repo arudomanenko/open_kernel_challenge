@@ -1,0 +1,47 @@
+[
+  {
+    "layer": "qkv_gate",
+    "exact_bits": true,
+    "base": 108,
+    "escape_fraction": 0.00013626946019940078,
+    "original_bytes": 37748736,
+    "packed_bytes": 28311552,
+    "retains_original_for_escapes": true
+  },
+  {
+    "layer": "o",
+    "exact_bits": true,
+    "base": 110,
+    "escape_fraction": 0.00018799304962158203,
+    "original_bytes": 16777216,
+    "packed_bytes": 12582912,
+    "retains_original_for_escapes": true
+  },
+  {
+    "layer": "pooler",
+    "exact_bits": true,
+    "base": 108,
+    "escape_fraction": 0.00013807415962219238,
+    "original_bytes": 67108864,
+    "packed_bytes": 50331648,
+    "retains_original_for_escapes": true
+  },
+  {
+    "layer": "unpooler",
+    "exact_bits": true,
+    "base": 109,
+    "escape_fraction": 0.00019487738609313965,
+    "original_bytes": 67108864,
+    "packed_bytes": 50331648,
+    "retains_original_for_escapes": true
+  },
+  {
+    "layer": "all_bf16_bit_patterns",
+    "exact_bits": true,
+    "base": 240,
+    "escape_fraction": 0.94140625,
+    "original_bytes": 131072,
+    "packed_bytes": 98304,
+    "retains_original_for_escapes": true
+  }
+]

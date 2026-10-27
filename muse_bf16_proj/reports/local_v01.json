@@ -1,0 +1,572 @@
+{
+  "device": "NVIDIA GeForce RTX 3080 Ti Laptop GPU",
+  "torch": "2.11.0+cu128",
+  "candidate": "muse_bf16_proj/experiments/v01_splitk.py",
+  "passed": true,
+  "checks": [
+    {
+      "m": 1,
+      "layer": "qkv_gate",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 0.000e+00 (worst row 0.000e+00)"
+    },
+    {
+      "m": 1,
+      "layer": "qkv_gate",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 0.000e+00 (worst row 0.000e+00); 1 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 1,
+      "layer": "o",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 0.000e+00 (worst row 0.000e+00)"
+    },
+    {
+      "m": 1,
+      "layer": "o",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 4.559e-05 (worst row 4.559e-05)"
+    },
+    {
+      "m": 1,
+      "layer": "pooler",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 0.000e+00 (worst row 0.000e+00)"
+    },
+    {
+      "m": 1,
+      "layer": "pooler",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 0.000e+00 (worst row 0.000e+00)"
+    },
+    {
+      "m": 1,
+      "layer": "unpooler",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 0.000e+00 (worst row 0.000e+00)"
+    },
+    {
+      "m": 1,
+      "layer": "unpooler",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 0.000e+00 (worst row 0.000e+00)"
+    },
+    {
+      "m": 1,
+      "layer": "router",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 1.625e-07 (worst row 1.625e-07)"
+    },
+    {
+      "m": 1,
+      "layer": "router",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 1.671e-07 (worst row 1.671e-07)"
+    },
+    {
+      "m": 8,
+      "layer": "qkv_gate",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 5.700e-05 (worst row 1.664e-04); 4 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 8,
+      "layer": "qkv_gate",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 1.138e-04 (worst row 1.655e-04); 2 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 8,
+      "layer": "o",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 1.659e-06 (worst row 5.916e-06); 2 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 8,
+      "layer": "o",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 2.088e-06 (worst row 5.651e-06); 1 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 8,
+      "layer": "pooler",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 1.011e-04 (worst row 1.478e-04); 2 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 8,
+      "layer": "pooler",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 2.889e-05 (worst row 6.156e-05); 4 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 8,
+      "layer": "unpooler",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 3.082e-06 (worst row 7.818e-06); 3 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 8,
+      "layer": "unpooler",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 5.288e-06 (worst row 1.545e-05); 3 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 8,
+      "layer": "router",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 2.536e-06 (worst row 2.831e-06); 2 probe rows exact to 2.5e-06"
+    },
+    {
+      "m": 8,
+      "layer": "router",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 2.508e-06 (worst row 2.922e-06); 1 probe rows exact to 2.5e-06"
+    },
+    {
+      "m": 16,
+      "layer": "qkv_gate",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 9.316e-05 (worst row 3.243e-04); 2 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 16,
+      "layer": "qkv_gate",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 3.290e-05 (worst row 8.428e-05); 3 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 16,
+      "layer": "o",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 1.849e-05 (worst row 8.727e-05); 3 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 16,
+      "layer": "o",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 1.447e-05 (worst row 8.587e-05); 8 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 16,
+      "layer": "pooler",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 7.909e-05 (worst row 2.512e-04); 3 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 16,
+      "layer": "pooler",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 8.020e-05 (worst row 2.571e-04); 2 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 16,
+      "layer": "unpooler",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 6.167e-05 (worst row 1.757e-04); 2 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 16,
+      "layer": "unpooler",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 3.082e-05 (worst row 8.595e-05); 3 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 16,
+      "layer": "router",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 2.475e-06 (worst row 2.839e-06); 3 probe rows exact to 2.8e-06"
+    },
+    {
+      "m": 16,
+      "layer": "router",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 2.542e-06 (worst row 2.964e-06); 3 probe rows exact to 2.6e-06"
+    },
+    {
+      "m": 32,
+      "layer": "qkv_gate",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 6.781e-05 (worst row 1.905e-04); 4 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 32,
+      "layer": "qkv_gate",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 6.076e-05 (worst row 1.855e-04); 8 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 32,
+      "layer": "o",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 1.632e-05 (worst row 8.609e-05); 3 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 32,
+      "layer": "o",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 8.994e-06 (worst row 4.360e-05); 7 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 32,
+      "layer": "pooler",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 5.235e-05 (worst row 1.240e-04); 7 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 32,
+      "layer": "pooler",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 7.962e-05 (worst row 2.424e-04); 4 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 32,
+      "layer": "unpooler",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 4.083e-05 (worst row 8.678e-05); 4 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 32,
+      "layer": "unpooler",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 4.069e-05 (worst row 1.735e-04); 6 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 32,
+      "layer": "router",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 2.533e-06 (worst row 2.959e-06); 6 probe rows exact to 3.0e-06"
+    },
+    {
+      "m": 32,
+      "layer": "router",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 2.521e-06 (worst row 2.799e-06); 1 probe rows exact to 2.3e-06"
+    },
+    {
+      "m": 128,
+      "layer": "qkv_gate",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 2.453e-03 (worst row 2.840e-03); 16 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 128,
+      "layer": "qkv_gate",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 2.537e-03 (worst row 2.854e-03); 20 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 128,
+      "layer": "o",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 6.542e-05 (worst row 2.658e-04); 15 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 128,
+      "layer": "o",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 6.071e-05 (worst row 1.833e-04); 15 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 128,
+      "layer": "pooler",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 3.715e-03 (worst row 4.051e-03); 19 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 128,
+      "layer": "pooler",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 3.791e-03 (worst row 4.028e-03); 12 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 128,
+      "layer": "unpooler",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 2.439e-03 (worst row 2.864e-03); 19 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 128,
+      "layer": "unpooler",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 2.513e-03 (worst row 2.790e-03); 19 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 128,
+      "layer": "router",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 2.489e-06 (worst row 2.812e-06); 16 probe rows exact to 2.8e-06"
+    },
+    {
+      "m": 128,
+      "layer": "router",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 2.513e-06 (worst row 3.007e-06); 17 probe rows exact to 2.7e-06"
+    },
+    {
+      "m": 256,
+      "layer": "qkv_gate",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 2.625e-03 (worst row 2.991e-03); 37 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 256,
+      "layer": "qkv_gate",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 2.591e-03 (worst row 2.980e-03); 29 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 256,
+      "layer": "o",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 6.254e-05 (worst row 2.168e-04); 30 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 256,
+      "layer": "o",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 5.614e-05 (worst row 1.924e-04); 39 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 256,
+      "layer": "pooler",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 2.574e-03 (worst row 2.813e-03); 25 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 256,
+      "layer": "pooler",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 2.571e-03 (worst row 2.888e-03); 28 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 256,
+      "layer": "unpooler",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 1.422e-04 (worst row 3.219e-04); 36 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 256,
+      "layer": "unpooler",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 1.557e-04 (worst row 2.931e-04); 28 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 256,
+      "layer": "router",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 2.504e-06 (worst row 2.928e-06); 25 probe rows exact to 2.7e-06"
+    },
+    {
+      "m": 256,
+      "layer": "router",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 2.496e-06 (worst row 2.876e-06); 52 probe rows exact to 2.7e-06"
+    },
+    {
+      "m": 7,
+      "layer": "pooler",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 5.701e-05 (worst row 1.378e-04); 1 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 7,
+      "layer": "pooler",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 5.139e-05 (worst row 1.207e-04)"
+    },
+    {
+      "m": 33,
+      "layer": "o",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 6.290e-05 (worst row 1.687e-04); 6 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 33,
+      "layer": "o",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 6.925e-05 (worst row 1.957e-04); 7 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 130,
+      "layer": "unpooler",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 1.463e-04 (worst row 3.288e-04); 19 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 130,
+      "layer": "unpooler",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 1.509e-04 (worst row 3.965e-04); 22 probe rows exact to 0.0e+00"
+    },
+    {
+      "m": 5,
+      "layer": "unpooler",
+      "dist": "normal",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 3.039e-08 (worst row 5.926e-08)"
+    },
+    {
+      "m": 5,
+      "layer": "unpooler",
+      "dist": "normal",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 0.000e+00 (worst row 0.000e+00)"
+    },
+    {
+      "m": 9,
+      "layer": "router",
+      "dist": "outliers",
+      "replay": 0,
+      "passed": true,
+      "message": "relative L2 error 2.484e-06 (worst row 2.663e-06); 3 probe rows exact to 2.7e-06"
+    },
+    {
+      "m": 9,
+      "layer": "router",
+      "dist": "outliers",
+      "replay": 1,
+      "passed": true,
+      "message": "relative L2 error 2.508e-06 (worst row 2.718e-06); 4 probe rows exact to 2.7e-06"
+    }
+  ],
+  "additional": [
+    "row-strided activations",
+    "all-zero inputs"
+  ]
+}

@@ -1,0 +1,341 @@
+[
+  {
+    "layer": "qkv_gate",
+    "m": 1,
+    "n": 2304,
+    "k": 8192,
+    "backend": "Triton FP32-reduction GEMV",
+    "parameters": [
+      1,
+      4
+    ]
+  },
+  {
+    "layer": "qkv_gate",
+    "m": 8,
+    "n": 2304,
+    "k": 8192,
+    "backend": "Triton split-K with FP32 partial reduction",
+    "parameters": [
+      16,
+      32,
+      256,
+      4,
+      4,
+      3
+    ]
+  },
+  {
+    "layer": "qkv_gate",
+    "m": 16,
+    "n": 2304,
+    "k": 8192,
+    "backend": "cuBLAS / cuBLASLt via torch.mm",
+    "parameters": [
+      false
+    ]
+  },
+  {
+    "layer": "qkv_gate",
+    "m": 32,
+    "n": 2304,
+    "k": 8192,
+    "backend": "cuBLAS / cuBLASLt via torch.mm",
+    "parameters": [
+      false
+    ]
+  },
+  {
+    "layer": "qkv_gate",
+    "m": 128,
+    "n": 2304,
+    "k": 8192,
+    "backend": "native DeepGEMM SM90 with tuned scheduling",
+    "parameters": [
+      128,
+      1
+    ]
+  },
+  {
+    "layer": "qkv_gate",
+    "m": 256,
+    "n": 2304,
+    "k": 8192,
+    "backend": "native DeepGEMM SM90",
+    "parameters": []
+  },
+  {
+    "layer": "o",
+    "m": 1,
+    "n": 8192,
+    "k": 1024,
+    "backend": "Triton FP32-reduction GEMV",
+    "parameters": [
+      4,
+      4
+    ]
+  },
+  {
+    "layer": "o",
+    "m": 8,
+    "n": 8192,
+    "k": 1024,
+    "backend": "cuBLAS / cuBLASLt via torch.mm",
+    "parameters": [
+      true
+    ]
+  },
+  {
+    "layer": "o",
+    "m": 16,
+    "n": 8192,
+    "k": 1024,
+    "backend": "cuBLAS / cuBLASLt via torch.mm",
+    "parameters": [
+      true
+    ]
+  },
+  {
+    "layer": "o",
+    "m": 32,
+    "n": 8192,
+    "k": 1024,
+    "backend": "cuBLAS / cuBLASLt via torch.mm",
+    "parameters": [
+      true
+    ]
+  },
+  {
+    "layer": "o",
+    "m": 128,
+    "n": 8192,
+    "k": 1024,
+    "backend": "cuBLAS / cuBLASLt via torch.mm",
+    "parameters": [
+      true
+    ]
+  },
+  {
+    "layer": "o",
+    "m": 256,
+    "n": 8192,
+    "k": 1024,
+    "backend": "cuBLAS / cuBLASLt via torch.mm",
+    "parameters": [
+      false
+    ]
+  },
+  {
+    "layer": "pooler",
+    "m": 1,
+    "n": 4096,
+    "k": 8192,
+    "backend": "SGLang Hopper GEMV",
+    "parameters": []
+  },
+  {
+    "layer": "pooler",
+    "m": 8,
+    "n": 4096,
+    "k": 8192,
+    "backend": "Triton KN split-K with FP32 partial reduction",
+    "parameters": [
+      16,
+      64,
+      128,
+      4,
+      4,
+      3
+    ]
+  },
+  {
+    "layer": "pooler",
+    "m": 16,
+    "n": 4096,
+    "k": 8192,
+    "backend": "native DeepGEMM SM90 with tuned scheduling",
+    "parameters": [
+      128,
+      1
+    ]
+  },
+  {
+    "layer": "pooler",
+    "m": 32,
+    "n": 4096,
+    "k": 8192,
+    "backend": "native DeepGEMM SM90",
+    "parameters": []
+  },
+  {
+    "layer": "pooler",
+    "m": 128,
+    "n": 4096,
+    "k": 8192,
+    "backend": "native DeepGEMM SM90",
+    "parameters": []
+  },
+  {
+    "layer": "pooler",
+    "m": 256,
+    "n": 4096,
+    "k": 8192,
+    "backend": "cuBLAS / cuBLASLt via torch.mm",
+    "parameters": [
+      true
+    ]
+  },
+  {
+    "layer": "unpooler",
+    "m": 1,
+    "n": 1024,
+    "k": 4096,
+    "backend": "Triton FP32-reduction GEMV",
+    "parameters": [
+      1,
+      4
+    ]
+  },
+  {
+    "layer": "unpooler",
+    "m": 8,
+    "n": 1024,
+    "k": 4096,
+    "backend": "Triton split-K with FP32 partial reduction",
+    "parameters": [
+      16,
+      32,
+      256,
+      4,
+      4,
+      3
+    ]
+  },
+  {
+    "layer": "unpooler",
+    "m": 16,
+    "n": 8192,
+    "k": 4096,
+    "backend": "cuBLAS / cuBLASLt via torch.mm",
+    "parameters": [
+      true
+    ]
+  },
+  {
+    "layer": "unpooler",
+    "m": 32,
+    "n": 8192,
+    "k": 4096,
+    "backend": "cuBLAS / cuBLASLt via torch.mm",
+    "parameters": [
+      true
+    ]
+  },
+  {
+    "layer": "unpooler",
+    "m": 128,
+    "n": 8192,
+    "k": 4096,
+    "backend": "cuBLAS / cuBLASLt via torch.mm",
+    "parameters": [
+      true
+    ]
+  },
+  {
+    "layer": "unpooler",
+    "m": 256,
+    "n": 8192,
+    "k": 4096,
+    "backend": "native DeepGEMM SM90 with tuned scheduling",
+    "parameters": [
+      132,
+      64
+    ]
+  },
+  {
+    "layer": "router",
+    "m": 1,
+    "n": 256,
+    "k": 8192,
+    "backend": "Triton FP32-reduction GEMV",
+    "parameters": [
+      1,
+      8
+    ]
+  },
+  {
+    "layer": "router",
+    "m": 8,
+    "n": 256,
+    "k": 8192,
+    "backend": "Triton split-K with FP32 partial reduction",
+    "parameters": [
+      16,
+      32,
+      128,
+      16,
+      4,
+      3
+    ]
+  },
+  {
+    "layer": "router",
+    "m": 16,
+    "n": 256,
+    "k": 8192,
+    "backend": "Triton split-K with FP32 partial reduction",
+    "parameters": [
+      16,
+      32,
+      128,
+      16,
+      4,
+      3
+    ]
+  },
+  {
+    "layer": "router",
+    "m": 32,
+    "n": 256,
+    "k": 8192,
+    "backend": "Triton split-K with FP32 partial reduction",
+    "parameters": [
+      16,
+      32,
+      128,
+      16,
+      4,
+      3
+    ]
+  },
+  {
+    "layer": "router",
+    "m": 128,
+    "n": 256,
+    "k": 8192,
+    "backend": "Triton split-K with FP32 partial reduction",
+    "parameters": [
+      64,
+      32,
+      128,
+      16,
+      4,
+      3
+    ]
+  },
+  {
+    "layer": "router",
+    "m": 256,
+    "n": 256,
+    "k": 8192,
+    "backend": "Triton split-K with FP32 partial reduction",
+    "parameters": [
+      64,
+      32,
+      64,
+      16,
+      4,
+      3
+    ]
+  }
+]
