@@ -14,7 +14,7 @@ SHAPES = {'qkv_gate': (2304, 8192), 'o': (8192, 1024),
 def write_csv(path, rows):
     if rows:
         with path.open('w', newline='') as stream:
-            writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
+            writer = csv.DictWriter(stream, fieldnames=list(rows[0]), lineterminator="\n")
             writer.writeheader()
             writer.writerows(rows)
 

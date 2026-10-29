@@ -1,13 +1,16 @@
 {
   "original_weight_bytes": 197132288,
   "transposed_layers": [
+    "o",
     "pooler",
+    "qkv_gate",
     "unpooler"
   ],
-  "extra_prepared_bytes": 142606336,
-  "retained_tensor_bytes": 339738624,
-  "retained_mib": 324.0,
-  "storage_ratio": 1.7234042553191489,
+  "extra_prepared_bytes": 205520896,
+  "retained_tensor_bytes": 402653184,
+  "retained_mib": 384.0,
+  "storage_ratio": 2.0425531914893615,
   "maximum_scored_fp32_split_workspace_bytes": 4194304,
-  "submission_sha256": "98c913426e8eaa9c81cac7b3daa18be19d303185d5cd52f89860400810f66d4b"
+  "maximum_selected_shared_memory_bytes": 163840,
+  "submission_sha256": "67982fe239b900bdaac86823ee95e4af888968e38158d6a7565ae75cc5716686"
 }

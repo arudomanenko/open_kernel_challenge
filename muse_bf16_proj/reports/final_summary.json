@@ -1,12 +1,12 @@
 {
-  "job": "cbbd6faa6ca74248",
-  "mode": "check",
-  "speedup": 1.2250314560925846,
+  "job": "c014ae47ef1e478b",
+  "mode": "run",
+  "speedup": 1.232248936198606,
   "speedup_ci": [
-    1.2066559842511957,
-    1.2434069279339732
+    1.2137652021556269,
+    1.2507326702415849
   ],
-  "score_us": 3943.408943480143,
+  "score_us": 3920.311763386585,
   "baseline_step_us": 4830.8,
   "gpu": "H200",
   "machine": {
@@ -16,9 +16,9 @@
       "clocks.sm": 1980,
       "driver_version": "580.159.03",
       "name": "NVIDIA H200",
-      "power.draw": 124.97,
+      "power.draw": 128.49,
       "power.limit": 700,
-      "temperature.gpu": 34
+      "temperature.gpu": 38
     },
     "gpu_before": {
       "clocks.max.sm": 1980,
@@ -26,11 +26,11 @@
       "clocks.sm": 1980,
       "driver_version": "580.159.03",
       "name": "NVIDIA H200",
-      "power.draw": 141.74,
+      "power.draw": 148.85,
       "power.limit": 700,
-      "temperature.gpu": 32
+      "temperature.gpu": 38
     },
-    "node": "n-jilerexm7jzqtha3u5ugsjopko"
+    "node": "n-hbquzsoc2fbla3mk4cpu32bkrb"
   },
   "evaluator": {
     "code_sha256": "986ed3ebb096eab83d16797609f4c0e7895248d6bce33252d25dd306cbe5d018",
@@ -50,7 +50,7 @@
   },
   "passed_tests": 9,
   "passed_scored_cases": 30,
-  "submission_sha256": "98c913426e8eaa9c81cac7b3daa18be19d303185d5cd52f89860400810f66d4b",
-  "service_content_hash": "20b358f690aa77f3e67a9a606410a5e6a09e9040bdac31600049241eb3f0432e",
-  "submission_bytes": 10819
+  "submission_sha256": "67982fe239b900bdaac86823ee95e4af888968e38158d6a7565ae75cc5716686",
+  "service_content_hash": "f9e0a0c40893b8b0aa0579581b75ff9f23bde4d9926f906a7e8f14ab92fc151f",
+  "submission_bytes": 20117
 }

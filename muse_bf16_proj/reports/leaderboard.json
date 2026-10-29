@@ -1,20 +1,20 @@
 {
   "board": "muse_bf16_proj",
   "measure": "speedup over SGLang; higher ranks higher",
-  "ranked": 1157,
+  "ranked": 1402,
   "leader": {
     "rank": 1,
-    "team": "colinlikescode",
-    "speedup": 1.6367,
+    "team": "naklecha",
+    "speedup": 1.6498,
     "first": true,
     "ahead": 0
   },
   "you": {
-    "rank": 582,
+    "rank": 701,
     "team": "arudomanenko",
-    "speedup": 1.2202,
+    "speedup": 1.2322,
     "first": false,
-    "ahead": 581,
-    "to_first": 1.3413
+    "ahead": 700,
+    "to_first": 1.3389
   }
 }

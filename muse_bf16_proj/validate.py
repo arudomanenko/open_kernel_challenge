@@ -86,8 +86,8 @@ def main():
     # Exercise every native-selected shape with views that fail its layout
     # contract, including contiguous tensors with an unaligned base pointer.
     layout_checks = 0
-    for (layer, m, n, k), tactic in mod._TACTICS.items():
-        if tactic[0] not in ("deep", "deepcfg", "sglang"):
+    for (layer, m, n, k), tactic in getattr(mod, "_TACTICS", {}).items():
+        if tactic[0] not in ("deep", "deepcfg", "sglang", "rev", "v", "simt", "cat"):
             continue
         for layout in ["padded_rows", "offset_base"]:
             data = reference.generate_input(m, layer, 14100 + m)

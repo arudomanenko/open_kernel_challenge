@@ -91,3 +91,82 @@ coordination. No claim of a new aggregate speed improvement follows from these
 changes: demonstrated benefits are lower memory, settings restoration, layout
 handling and bounded nearby-shape dispatch. Direct TMA/WGMMA scheduler development
 and single-launch split-K remain future experiments.
+
+
+## CUDA rewrite: v19–v34 (2026-10-30)
+
+The rewrite replaces all Triton kernels with embedded CUDA C++ while retaining
+CUDA library paths that benchmark better. CUDA is compiled with the supported
+Torch extension loader during preparation. The current [kernels.cu](../kernels.cu)
+is the readable source mirrored inside the standalone submission. Original
+Triton snapshots remain in `experiments/` for comparison.
+
+| Version | Experiment | Official speedup |
+|---|---|---:|
+| v19 | Initial vector GEMV and shared-memory WMMA split-K | 0.81995× |
+| v20 | WMMA/GEMV search, safe CTA-cluster distributed-shared-memory reduction | 1.11404× |
+| v21 | Eleven transposed CUTLASS tiles and direct register MMA | 1.12379× |
+| v22 | Streamed/shared-activation GEMV, exact BF16 packing, FP32 SIMT router | 1.11365× |
+| v23 | Batched split-K CUTLASS with FP32 partial outputs | 1.12464× |
+| v24 | Combined hi/lo library GEMM with CUDA FP32 output addition | 1.18784× |
+| v25 | Header-free forward WGMMA router with separate FP32 accumulators | 1.12480× |
+| v26 | Reverse-orientation WGMMA with interleaved shared memory | 1.18485× |
+| v27 | 128-byte swizzled shared-memory WGMMA | 1.19962× |
+| v28 | Double-buffered asynchronous-copy/WGMMA overlap | 1.20789× |
+| v29 | Prefetched GEMV; compilation failure for K=1024 zero-sized arrays | No timing: setup failed |
+| v30 | Standard CUTLASS multicast; blocked by the same shared compilation bug | No timing: setup failed |
+| v31 | Fixed prefetch plus standard CUTLASS multicast search | 1.23590× |
+| v32 | Frozen CUDA production file, no preparation search | 1.22462× |
+| v33 | H200 production audit: 264 changing-input/layout graph checks | 1.22376× |
+
+The scored v34 result is recorded in the current final report and raw result
+JSON. [cuda_tuning.json](cuda_tuning.json) retains the available diagnostic top
+candidate timings from each search. These CUDA-event measurements have different
+overhead from the official harness and must not be substituted for official
+case latencies. Earlier raw JSON and source snapshots retain failed experiments.
+
+### What the measurements support
+
+- The first direct CUDA port was correct but substantially slower. Shared-memory
+  WMMA and direct register MMA were insufficient to replace optimized libraries
+  across the workload. Writing CUDA by itself did not produce a speedup.
+- CTA-cluster split-K was implemented with cluster synchronization, distributed
+  shared-memory reads and a final synchronization before block exit. It avoided
+  output initialization and unsafe global spin barriers, but no tested cluster
+  configuration won its search.
+- Both transposed and standard CUTLASS geometry, multiple tile sizes/stages,
+  ping-pong schedules, K splitting and cluster multicast were measured. Some
+  split-K variants won small diagnostic cases by narrow margins, but none of the
+  final standard/multicast configurations displaced the selected production path.
+- Shared-memory swizzling materially improved the custom reverse WGMMA kernel.
+  Double buffering improved selected small shapes further. Large BF16 shapes
+  still favor cuBLAS or native DeepGEMM and retain those paths.
+- A single BF16 library GEMM over concatenated hi/lo output columns, followed by
+  one CUDA FP32 addition, fixed the early CUDA rewrite's large-router regression.
+  Hi and lo remain separate FP32 accumulations until that addition.
+- The exact BF16 representation uses one sign/mantissa byte plus four exponent
+  bits, with escape code 15 reading original BF16 words. Preparation verified bit
+  equality for the supplied weights, and candidate outputs were checked. No
+  compressed configuration won v22; it is excluded from production.
+- The new prefetched GEMV uses compile-time K, issues vector loads before
+  arithmetic and accumulates independent lanes before reduction. It improved
+  selected one-token cases. The initial K=1024 compile failure was fixed with a
+  positive rounded-up vector count and masked inactive threads, then tested
+  locally for every layer before v31.
+
+### Production constraints and remaining opportunity
+
+The final production file contains no tuning, diagnostic timing, cluster kernels,
+compression, CUTLASS header dependency, or Triton import. It retains original BF16
+weights, the permitted router hi/lo pair and selected exact transposes. Native
+DeepGEMM configuration remains scoped and serialized among this module's callers.
+
+The CUDA rewrite matches the prior implementation's aggregate speed within
+uncertainty. Search v31 measured 1.23590× and the frozen check measured 1.22462×;
+that difference is not evidence of an optimization regression or a significant
+new win. The initial leader snapshot was 1.6367×; the final refreshed board showed 1.6498×. No first-place result is claimed.
+
+Remaining large gains would require a more efficient large-BF16 memory/scheduling
+path or a demonstrably faster lossless decode path. The tested implementations
+did not establish one. Further work should begin with controlled H200 hardware
+profiling; the environment still denies Nsight Compute performance counters.

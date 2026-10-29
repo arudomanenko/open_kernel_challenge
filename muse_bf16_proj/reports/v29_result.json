@@ -1,0 +1,88 @@
+{
+  "board": "muse_bf16_proj",
+  "call_id": "kc-0e95d0331c5740e3",
+  "cluster": "sfo3",
+  "content_hash": "055405ece4d46a8e64a26f8478d927c96d22c90dd03de9c19c4ba9d67c876174",
+  "created_at": 1793308613.0424953,
+  "dedicated": false,
+  "duplicate_of": null,
+  "finished_at": 1793308651.5632045,
+  "id": "0e95d0331c5740e3",
+  "mode": "check",
+  "output": {
+    "log": "/home/evo/Workspace/open_kernel_challenge/muse_bf16_proj/experiments/profiles/v29_prefetched_gemv.0e95d0331c5740e3.log"
+  },
+  "payload_ref": "muse_bf16_proj/055405ece4d46a8e64a26f8478d927c96d22c90dd03de9c19c4ba9d67c876174.py",
+  "result": {
+    "checks": {
+      "flagged": [],
+      "ok": true,
+      "rejected": []
+    },
+    "error": null,
+    "evaluator": {
+      "code_sha256": "986ed3ebb096eab83d16797609f4c0e7895248d6bce33252d25dd306cbe5d018",
+      "files": {
+        "challenge/checks.py": "9a046c3c38db28b325dcd1557baecdf6bc9ef941d2175f9a900ba4c230bb8055",
+        "challenge/nvfp4.py": "cfdf37c7bc14b10f7353aba7d4632f4767401b92b4b073941a8030d9a961aaaf",
+        "configs/muse-spark-open.yaml": "98f07230e4e64fe91b7c76d9a3ce04948053c043d494d5f1fae56cfe2de033af",
+        "harness/eval.py": "0051a1bfac67a9f1fad06086b306653c6643b2bb253e15a794aa672312f070a9",
+        "harness/runner.py": "c905e5c80264c6d27620b6fc7d55b162dccdb8ed7282f8a513a4d2e6f2f226f2",
+        "harness/static_checks.py": "c5588b69e9e86229459a525c61b30096f6f13ff2add6cadf98f272c4ac8ca0c2",
+        "harness/worker.py": "950437610f57ddffbc1176b65d9c2ae909c47bf67b1e3fe0716a81946986f568",
+        "problems/muse_bf16_proj/baseline.py": "39f52ea5b65505958aa9dee9c8129dd394cbba4e670046f862b5a88ce91a0574",
+        "problems/muse_bf16_proj/reference.py": "e62491abc9ddcad33f5faba8b0ee74cf6370b7be5dd2dc05031742f3ebf7147d",
+        "problems/muse_bf16_proj/task.yml": "18e9da6357144b0a1348434a18bd2d1938b1948d9f2130876f6b6706588470c9"
+      },
+      "image": "localhost:30500/kc/judge@sha256:9a7f287b80d772c6f636bbcb57422c619fe326e2aabc53803b85007bca93f68e"
+    },
+    "flags": [],
+    "gpu": "H200",
+    "log_tail": "Traceback (most recent call last):\n  File \"/opt/sglang/lib/python3.12/site-packages/torch/utils/cpp_extension.py\", line 2906, in _run_ninja_build\n    subprocess.run(\n  File \"/usr/lib/python3.12/subprocess.py\", line 571, in run\n    raise CalledProcessError(retcode, process.args,\nsubprocess.CalledProcessError: Command '['ninja', '-v']' returned non-zero exit status 1.\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"/tmp/muse_bf16_proj-hanemjyt/run/worker.py\", line 423, in child_main\n    send(_setup_op(msg, module, state, sync, perf))\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/muse_bf16_proj-hanemjyt/run/worker.py\", line 322, in _setup_op\n    state[\"prep\"] = prepare(weights)\n                    ^^^^^^^^^^^^^^^^\n  File \"/tmp/muse_bf16_proj-hanemjyt/run/submission.py\", line 111, in prepare\n    state[\"ext\"]=load_inline(name=\"muse_cuda_v29\",cpp_sources=_CPP,cuda_sources=_CUDA,\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/sglang/lib/python3.12/site-packages/torch/utils/cpp_extension.py\", line 2295, in load_inline\n    return _jit_compile(\n           ^^^^^^^^^^^^^\n  File \"/opt/sglang/lib/python3.12/site-packages/torch/utils/cpp_extension.py\", line 2398, in _jit_compile\n    _write_ninja_file_and_build_library(\n  File \"/opt/sglang/lib/python3.12/site-packages/torch/utils/cpp_extension.py\", line 2555, in _write_ninja_file_and_build_library\n    _run_ninja_build(\n  File \"/opt/sglang/lib/python3.12/site-packages/torch/utils/cpp_extension.py\", line 2923, in _run_ninja_build\n    raise RuntimeError(message) from e\nRuntimeError: Error building extension 'muse_cuda_v29': [1/3] ccache /usr/local/cuda/bin/nvcc -MD -MF cuda.cuda.o.d -DTORCH_EXTENSION_NAME=muse_cuda_v29 -DTORCH_API_INCLUDE_EXTENSION_H -isystem /opt/sglang/lib/python3.12/site-packages/torch/include -isystem /opt/sglang/lib/python3.12/site-packages/torch/include/torch/csrc/api/include -isystem /usr/local/cuda/include -isystem /usr/include/python3.12 -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr --compiler-options '-fPIC' -O3 --expt-relaxed-constexpr -gencode=arch=compute_90a,code=sm_90a -std=c++20 -c /tmp/muse_bf16_proj-hanemjyt/sandbox/cache/torch_extensions/muse_cuda_v29/cuda.cu -o cuda.cuda.o \nFAILED: [code=1] cuda.cuda.o \nccache /usr/local/cuda/bin/nvcc -MD -MF cuda.cuda.o.d -DTORCH_EXTENSION_NAME=muse_cuda_v29 -DTORCH_API_INCLUDE_EXTENSION_H -isystem /opt/sglang/lib/python3.12/site-packages/torch/include -isystem /opt/sglang/lib/python3.12/site-packages/torch/include/torch/csrc/api/include -isystem /usr/local/cuda/include -isystem /usr/include/python3.12 -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr --compiler-options '-fPIC' -O3 --expt-relaxed-constexpr -gencode=arch=compute_90a,code=sm_90a -std=c++20 -c /tmp/muse_bf16_proj-hanemjyt/sandbox/cache/torch_extensions/muse_cuda_v29/cuda.cu -o cuda.cuda.o \n/tmp/muse_bf16_proj-hanemjyt/sandbox/cache/torch_extensions/muse_cuda_v29/cuda.cu:628: warning: \"RV\" redefined\n  628 | #define RV(N,K) if(tn==N \u0026\u0026 bk==K) {if(router) reverse_sw_gemm\u003cN,K,true\u003e\u003c\u003c\u003cgrid,128,0,s\u003e\u003e\u003e((bf*)x,(bf*)w,(bf*)lo,(float*)p,(void*)y,m,n,k,sx,split);else reverse_sw_gemm\u003cN,K,false\u003e\u003c\u003c\u003cgrid,128,0,s\u003e\u003e\u003e((bf*)x,(bf*)w,(bf*)lo,(float*)p,(void*)y,m,n,k,sx,split);}\n      | \n/tmp/muse_bf16_proj-hanemjyt/sandbox/cache/torch_extensions/muse_cuda_v29/cuda.cu:565: note: this is the location of the previous definition\n  565 | #define RV(N,K) if(tn==N \u0026\u0026 bk==K) {if(router) reverse_gemm\u003cN,K,true\u003e\u003c\u003c\u003cgrid,128,0,s\u003e\u003e\u003e((bf*)x,(bf*)w,(bf*)lo,(float*)p,(void*)y,m,n,k,sx,split);else reverse_gemm\u003cN,K,false\u003e\u003c\u003c\u003cgrid,128,0,s\u003e\u003e\u003e((bf*)x,(bf*)w,(bf*)lo,(float*)p,(void*)y,m,n,k,sx,split);}\n      | \n/tmp/muse_bf16_proj-hanemjyt/sandbox/cache/torch_extensions/muse_cuda_v29/cuda.cu:628: warning: \"RV\" redefined\n  628 | #define RV(N,K) if(tn==N \u0026\u0026 bk==K) {if(router) reverse_sw_gemm\u003cN,K,true\u003e\u003c\u003c\u003cgrid,128,0,s\u003e\u003e\u003e((bf*)x,(bf*)w,(bf*)lo,(float*)p,(void*)y,m,n,k,sx,split);else reverse_sw_gemm\u003cN,K,false\u003e\u003c\u003c\u003cgrid,128,0,s\u003e\u003e\u003e((bf*)x,(bf*)w,(bf*)lo,(float*)p,(void*)y,m,n,k,sx,split);}\n      | \n/tmp/muse_bf16_proj-hanemjyt/sandbox/cache/torch_extensions/muse_cuda_v29/cuda.cu:565: note: this is the location of the previous definition\n  565 | #define RV(N,K) if(tn==N \u0026\u0026 bk==K) {if(router) reverse_gemm\u003cN,K,true\u003e\u003c\u003c\u003cgrid,128,0,s\u003e\u003e\u003e((bf*)x,(bf*)w,(bf*)lo,(float*)p,(void*)y,m,n,k,sx,split);else reverse_gemm\u003cN,K,false\u003e\u003c\u003c\u003cgrid,128,0,s\u003e\u003e\u003e((bf*)x,(bf*)w,(bf*)lo,(float*)p,(void*)y,m,n,k,sx,split);}\n      | \n/tmp/muse_bf16_proj-hanemjyt/sandbox/cache/torch_extensions/muse_cuda_v29/cuda.cu(257): error: zero-sized variable \"xs\" is not allowed in device code\n   uint4 xs[V],ws[V];float4 wf[2*V];\n         ^\n          detected during instantiation of \"void prefetch_gemv\u003cK,T,FP32\u003e(const bf *, const void *, void *, int) [with K=1024, T=256, FP32=true]\" at line 296\n\n/tmp/muse_bf16_proj-hanemjyt/sandbox/cache/torch_extensions/muse_cuda_v29/cuda.cu(257): error: zero-sized variable \"ws\" is not allowed in device code\n   uint4 xs[V],ws[V];float4 wf[2*V];\n               ^\n          detected during instantiation of \"void prefetch_gemv\u003cK,T,FP32\u003e(const bf *, const void *, void *, int) [with K=1024, T=256, FP32=true]\" at line 296\n\n/tmp/muse_bf16_proj-hanemjyt/sandbox/cache/torch_extensions/muse_cuda_v29/cuda.cu(257): error: zero-sized variable \"wf\" is not allowed in device code\n   uint4 xs[V],ws[V];float4 wf[2*V];\n                            ^\n          detected during instantiation of \"void prefetch_gemv\u003cK,T,FP32\u003e(const bf *, const void *, void *, int) [with K=1024, T=256, FP32=true]\" at line 296\n\n/tmp/muse_bf16_proj-hanemjyt/sandbox/cache/torch_extensions/muse_cuda_v29/cuda.cu(257): error: zero-sized variable \"xs\" is not allowed in device code\n   uint4 xs[V],ws[V];float4 wf[2*V];\n         ^\n          detected during instantiation of \"void prefetch_gemv\u003cK,T,FP32\u003e(const bf *, const void *, void *, int) [with K=1024, T=256, FP32=false]\" at line 296\n\n/tmp/muse_bf16_proj-hanemjyt/sandbox/cache/torch_extensions/muse_cuda_v29/cuda.cu(257): error: zero-sized variable \"ws\" is not allowed in device code\n   uint4 xs[V],ws[V];float4 wf[2*V];\n               ^\n          detected during instantiation of \"void prefetch_gemv\u003cK,T,FP32\u003e(const bf *, const void *, void *, int) [with K=1024, T=256, FP32=false]\" at line 296\n\n/tmp/muse_bf16_proj-hanemjyt/sandbox/cache/torch_extensions/muse_cuda_v29/cuda.cu(257): error: zero-sized variable \"wf\" is not allowed in device code\n   uint4 xs[V],ws[V];float4 wf[2*V];\n                            ^\n          detected during instantiation of \"void prefetch_gemv\u003cK,T,FP32\u003e(const bf *, const void *, void *, int) [with K=1024, T=256, FP32=false]\" at line 296\n\n/tmp/muse_bf16_proj-hanemjyt/sandbox/cache/torch_extensions/muse_cuda_v29/cuda.cu(257): error: zero-sized variable \"xs\" is not allowed in device code\n   uint4 xs[V],ws[V];float4 wf[2*V];\n         ^\n          detected during instantiation of \"void prefetch_gemv\u003cK,T,FP32\u003e(const bf *, const void *, void *, int) [with K=1024, T=512, FP32=true]\" at line 296\n\n/tmp/muse_bf16_proj-hanemjyt/sandbox/cache/torch_extensions/muse_cuda_v29/cuda.cu(257): error: zero-sized variable \"ws\" is not allowed in device code\n   uint4 xs[V],ws[V];float4 wf[2*V];\n               ^\n          detected during instantiation of \"void prefetch_gemv\u003cK,T,FP32\u003e(const bf *, const void *, void *, int) [with K=1024, T=512, FP32=true]\" at line 296\n\n/tmp/muse_bf16_proj-hanemjyt/sandbox/cache/torch_extensions/muse_cuda_v29/cuda.cu(257): error: zero-sized variable \"wf\" is not allowed in device code\n   uint4 xs[V],ws[V];float4 wf[2*V];\n                            ^\n          detected during instantiation of \"void prefetch_gemv\u003cK,T,FP32\u003e(const bf *, const void *, void *, int) [with K=1024, T=512, FP32=true]\" at line 296\n\n/tmp/muse_bf16_proj-hanemjyt/sandbox/cache/torch_extensions/muse_cuda_v29/cuda.cu(257): error: zero-sized variable \"xs\" is not allowed in device code\n   uint4 xs[V],ws[V];float4 wf[2*V];\n         ^\n          detected during instantiation of \"void prefetch_gemv\u003cK,T,FP32\u003e(const bf *, const void *, void *, int) [with K=1024, T=512, FP32=false]\" at line 296\n\n/tmp/muse_bf16_proj-hanemjyt/sandbox/cache/torch_extensions/muse_cuda_v29/cuda.cu(257): error: zero-sized variable \"ws\" is not allowed in device code\n   uint4 xs[V],ws[V];float4 wf[2*V];\n               ^\n          detected during instantiation of \"void prefetch_gemv\u003cK,T,FP32\u003e(const bf *, const void *, void *, int) [with K=1024, T=512, FP32=false]\" at line 296\n\n/tmp/muse_bf16_proj-hanemjyt/sandbox/cache/torch_extensions/muse_cuda_v29/cuda.cu(257): error: zero-sized variable \"wf\" is not allowed in device code\n   uint4 xs[V],ws[V];float4 wf[2*V];\n                            ^\n          detected during instantiation of \"void prefetch_gemv\u003cK,T,FP32\u003e(const bf *, const void *, void *, int) [with K=1024, T=512, FP32=false]\" at line 296\n\n12 errors detected in the compilation of \"/tmp/muse_bf16_proj-hanemjyt/sandbox/cache/torch_extensions/muse_cuda_v29/cuda.cu\".\n[2/3] ccache c++ -MMD -MF main.o.d -DTORCH_EXTENSION_NAME=muse_cuda_v29 -DTORCH_API_INCLUDE_EXTENSION_H -isystem /opt/sglang/lib/python3.12/site-packages/torch/include -isystem /opt/sglang/lib/python3.12/site-packages/torch/include/torch/csrc/api/include -isystem /usr/local/cuda/include -isystem /usr/include/python3.12 -fPIC -std=c++20 -O3 -c /tmp/muse_bf16_proj-hanemjyt/sandbox/cache/torch_extensions/muse_cuda_v29/main.cpp -o main.o \nninja: build stopped: subcommand failed.\n\n",
+    "machine": {
+      "gpu_after": {
+        "clocks.max.sm": 1980,
+        "clocks.mem": 3201,
+        "clocks.sm": 1980,
+        "driver_version": "580.159.03",
+        "name": "NVIDIA H200",
+        "power.draw": 121,
+        "power.limit": 700,
+        "temperature.gpu": 31
+      },
+      "gpu_before": {
+        "clocks.max.sm": 1980,
+        "clocks.mem": 3201,
+        "clocks.sm": 1980,
+        "driver_version": "580.159.03",
+        "name": "NVIDIA H200",
+        "power.draw": 137.8,
+        "power.limit": 700,
+        "temperature.gpu": 30
+      },
+      "node": "n-fwq5zu7sgu2oyb5nsz3gf5n23p"
+    },
+    "passed": false,
+    "records": [
+      {
+        "baseline_copies": 16,
+        "baseline_prepare_pad": 2703360,
+        "copies": null,
+        "error": "RuntimeError: Error building extension 'muse_cuda_v29': [1/3] ccache /usr/local/cuda/bin/nvcc -MD -MF cuda.cuda.o.d -DTORCH_EXTENSION_NAME=muse_cuda_v29 -DTORCH_API_INCLUDE_EXTENSION_H -isystem /opt/sglang/lib/python3.12/site-packages/torch/include -isystem /opt/sglang/lib/python3.12/site-packages/torch/include/torch/csrc/api/include -isystem /usr/local/cuda/include -isystem /usr/include/python3.12 -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr --compiler-options '-fPIC' -O3 --expt-relaxed-constexpr -gencode=arch=compute_90a,code=sm_90a -std=c++20 -c /tmp/muse_bf16_proj-hanemjyt/sandbox/cache/torch_extensions/muse_cuda_v29/cuda.cu -o cuda.cuda.o \nFAILED: [code=1] cuda.cuda.o \nccache /usr/local/cuda/bin/nvcc -MD -MF cuda.cuda.o.d -DTORCH_EXTENSION_NAME=muse_cuda_v29 -DTORCH_API_INCLUDE_EXTENSION_H -isystem /opt/sglang/lib/python3.12/site-packages/torch/include -isystem /opt/sglang/lib/python3.12/site-packages/torch/include/torch/csrc/api/include -isystem /usr/local/cuda/include -isystem /usr/include/python3.12 -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr --compiler-options '-fPIC' -O3 --expt-relaxed-constexpr -gencode=arch=compute_90a,code=sm_90a -std=c++20 -c /tmp/muse_bf16_proj-hanemjyt/sandbox/cache/torch_extensions/muse_cuda_v29/cuda.cu -o cuda.cuda.o \n/tmp/muse_bf16_proj-hanemjyt/sandbox/cache/torch_extensions/muse_cuda_v29/cuda.cu:628: warning: \"RV\" redefined\n  628 | #define RV(N,K) if(tn==N \u0026\u0026 bk==K) {if(router) reverse_sw_gemm\u003cN,K,true\u003e\u003c\u003c\u003cgrid,128,0,s\u003e\u003e\u003e((bf*)x,(bf*)w,(bf*)lo,(float*)p,(void*)y,m,n,k,sx,split);else reverse_sw_gemm\u003cN,K,false\u003e\u003c\u003c\u003cgrid,128,0,s\u003e\u003e\u003e((bf*)x,(bf*)w,(bf*)lo,(float*)p,(void*)y,m,n,k,sx,split);}\n      | \n/tmp/muse_bf16_proj-hanemjyt/sandbox/cache/torch_extensions/muse_cuda_v29/cuda.cu:565: note: this is the location of the previous d",
+        "event": "setup",
+        "first": "submission",
+        "prepare_pad": null,
+        "prepare_s": null,
+        "status": "fail"
+      }
+    ],
+    "returncode": 112,
+    "score_us": null,
+    "speedup": null,
+    "speedup_ci": null,
+    "status": "ok"
+  },
+  "started_at": 1793308624.6680443,
+  "status": "done",
+  "team": "arudomanenko"
+}

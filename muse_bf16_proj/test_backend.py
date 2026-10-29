@@ -26,7 +26,7 @@ class Backend:
     def use_deterministic_algorithms(self, value):
         self.deterministic = value
 
-    def gemm(self, x, w, out):
+    def bf16_gemm_nt(self, x, w, out):
         expected = self.sms
         self.calls += 1
         time.sleep(0.005)  # Release the GIL, like a native FFI call can.
@@ -41,12 +41,15 @@ class BackendTests(unittest.TestCase):
         self.backend = Backend()
         self.state = {"qkv_gate": torch.randn(16, 16).bfloat16(),
                       "transposed": {}, "sms": 132,
-                      "deep_module": self.backend, "deep": self.backend.gemm}
+                      "deep": self.backend}
         self.x = torch.randn(2, 16).bfloat16()
 
     def call(self, sms=128, x=None):
-        return mod._execute(self.x if x is None else x, "qkv_gate", 16,
-                            self.state, ("deepcfg", sms))
+        if x is not None:
+            from unittest.mock import patch
+            with patch.dict(mod._TACTICS, {("qkv_gate", 2, 16, 16): ("deep", sms)}):
+                return mod.kernel_fn({"x": x, "config": {"layer": "qkv_gate", "n": 16}}, self.state)
+        return mod._run(self.x, "qkv_gate", 16, self.state, ("deep", sms))
 
     def assert_restored(self):
         self.assertEqual(self.backend.sms, 83)

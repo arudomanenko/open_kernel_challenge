@@ -1,3 +1,5 @@
+> Historical report for the named revision. Shared benchmark and metadata links now describe the latest revision; use that revision's raw result JSON and source snapshot for exact historical evidence.
+
 # Muse BF16 projection implementation report
 
 Date: 2026-10-27, Europe/Moscow. Final scored job: `86e5f6c3e21d41eb`.

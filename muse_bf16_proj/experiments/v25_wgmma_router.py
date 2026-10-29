@@ -1,0 +1,166 @@
+# okc: problem=muse_bf16_proj
+"""H200 dense projections: measured GEMV, split-K router, and library GEMM paths.
+
+BF16 weights retain their original values. Only the router uses the explicitly
+permitted BF16 hi/lo representation, with separate FP32 accumulators.
+"""
+from typing import TypedDict
+from threading import RLock
+
+import torch
+
+
+# Serialize configuration and launch among callers of this module. External
+# DeepGEMM users must coordinate separately if they change runtime settings.
+_DEEP_LOCK = RLock()
+
+
+class Weights(TypedDict):
+    qkv_gate: torch.Tensor
+    o: torch.Tensor
+    pooler: torch.Tensor
+    unpooler: torch.Tensor
+    router: torch.Tensor
+
+
+class Config(TypedDict):
+    m: int
+    n: int
+    k: int
+    layer: str
+
+
+class Inputs(TypedDict):
+    x: torch.Tensor
+    config: Config
+
+
+_CPP = '#include <pybind11/pybind11.h>\n#include <stdint.h>\nvoid gemv(uint64_t,uint64_t,uint64_t,int,int,int,int,bool,uint64_t);\nvoid gemm(uint64_t,uint64_t,uint64_t,uint64_t,uint64_t,int,int,int,int,int,int,int,bool,uint64_t);\nvoid wgmma(uint64_t,uint64_t,uint64_t,uint64_t,uint64_t,int,int,int,int,int,int,int,uint64_t);\nvoid combine(uint64_t,uint64_t,int,int,bool,uint64_t);\nvoid reduce(uint64_t,uint64_t,int,int,bool,uint64_t);\nvoid compressed(uint64_t,uint64_t,uint64_t,uint64_t,uint64_t,int,int,int,int,int,uint64_t);\nvoid simt(uint64_t,uint64_t,uint64_t,int,int,int,int,int,int,uint64_t);\nPYBIND11_MODULE(TORCH_EXTENSION_NAME,m) { m.def("gemv",&gemv); m.def("gemm",&gemm); m.def("simt",&simt); m.def("compressed",&compressed); m.def("reduce",&reduce); m.def("combine",&combine); m.def("wgmma",&wgmma); }\n'
+_CUDA = '#include <cuda.h>\n#include <cuda_runtime.h>\n#include <cuda_bf16.h>\n#include <mma.h>\n#include <cooperative_groups.h>\n#include <stdint.h>\n#include <stdexcept>\nnamespace wm = nvcuda::wmma;\nusing bf = __nv_bfloat16;\n\n__device__ __forceinline__ float warp_sum(float v) {\n  for(int s=16;s;s/=2) v += __shfl_down_sync(0xffffffff,v,s);\n  return v;\n}\ntemplate<bool FLOAT_W,int ROWS,int THREADS>\n__global__ void vec_gemv(const bf* __restrict__ x,const void* wp,void* yp,int N,int K) {\n  int tid=threadIdx.x, lane=tid%32, warp=tid/32;\n  constexpr int GROUP = THREADS/ROWS;\n  int row=blockIdx.x*ROWS+tid/GROUP, t=tid%GROUP;\n  float v=0;\n  if(row<N) {\n    for(int k=t*8;k<K;k+=GROUP*8) {\n      uint4 a=*reinterpret_cast<const uint4*>(x+k);\n      bf* av=reinterpret_cast<bf*>(&a);\n      if constexpr(FLOAT_W) {\n        float4 b0=*reinterpret_cast<const float4*>((const float*)wp+row*K+k);\n        float4 b1=*reinterpret_cast<const float4*>((const float*)wp+row*K+k+4);\n        float w[8]={b0.x,b0.y,b0.z,b0.w,b1.x,b1.y,b1.z,b1.w};\n        #pragma unroll\n        for(int i=0;i<8;i++) v=fmaf(__bfloat162float(av[i]),w[i],v);\n      } else {\n        uint4 b=*reinterpret_cast<const uint4*>((const bf*)wp+row*K+k);\n        bf* bv=reinterpret_cast<bf*>(&b);\n        #pragma unroll\n        for(int i=0;i<8;i++) v=fmaf(__bfloat162float(av[i]),__bfloat162float(bv[i]),v);\n      }\n    }\n  }\n  v=warp_sum(v);\n  if constexpr(GROUP==32) {\n    if(lane==0 && row<N) {\n      if constexpr(FLOAT_W) ((float*)yp)[row]=v;\n      else ((bf*)yp)[row]=__float2bfloat16_rn(v);\n    }\n  } else {\n    __shared__ float sums[THREADS/32];\n    if(lane==0) sums[warp]=v;\n    __syncthreads();\n    if(t==0 && row<N) {\n      float z=0;\n      #pragma unroll\n      for(int j=0;j<GROUP/32;j++) z+=sums[(tid/GROUP)*(GROUP/32)+j];\n      if constexpr(FLOAT_W) ((float*)yp)[row]=z;\n      else ((bf*)yp)[row]=__float2bfloat16_rn(z);\n    }\n  }\n}\n\n__device__ __forceinline__ void cp16(void* dst,const void* src,bool valid) {\n#if __CUDA_ARCH__ >= 800\n  unsigned addr=__cvta_generic_to_shared(dst);\n  asm volatile("cp.async.cg.shared.global [%0], [%1], 16, %2;"::"r"(addr),"l"(src),"r"(valid?16:0));\n#endif\n}\n__device__ __forceinline__ void cpwait() {\n  asm volatile("cp.async.commit_group;\\n cp.async.wait_group 0;":::"memory");\n  __syncthreads();\n}\n\ntemplate<int BN,int BK,int THREADS,bool ROUTER,bool CLUSTER=false>\n__global__ void small_gemm(const bf* __restrict__ x,const bf* __restrict__ w,\n const bf* __restrict__ lo,float* __restrict__ p,void* __restrict__ y,int M,int N,int K,int SX,int split) {\n  __shared__ __align__(32) bf a[16][BK+8];\n  __shared__ __align__(32) bf b[BN][BK+8];\n  __shared__ __align__(32) bf bl[ROUTER?BN:1][BK+8];\n  __shared__ __align__(32) float out[16][BN];\n  int tid=threadIdx.x, warp=tid/32;\n  int mo=blockIdx.x*16,no=blockIdx.y*BN,si=blockIdx.z;\n  wm::fragment<wm::accumulator,16,16,16,float> acc, low;\n  wm::fill_fragment(acc,0.f); wm::fill_fragment(low,0.f);\n  for(int ko=si*BK;ko<K;ko+=split*BK) {\n    for(int i=tid;i<16*(BK/8);i+=THREADS) {\n      int r=i/(BK/8),c=(i%(BK/8))*8;\n      cp16(&a[r][c], x+(mo+r)*SX+ko+c, mo+r<M && ko+c<K);\n    }\n    for(int i=tid;i<BN*(BK/8);i+=THREADS) {\n      int r=i/(BK/8),c=(i%(BK/8))*8;\n      cp16(&b[r][c], w+(no+r)*K+ko+c, no+r<N && ko+c<K);\n      if constexpr(ROUTER) cp16(&bl[r][c],lo+(no+r)*K+ko+c,no+r<N && ko+c<K);\n    }\n    cpwait();\n    if(warp<BN/16) {\n      #pragma unroll\n      for(int kk=0;kk<BK;kk+=16) {\n        wm::fragment<wm::matrix_a,16,16,16,bf,wm::row_major> af;\n        wm::fragment<wm::matrix_b,16,16,16,bf,wm::col_major> bf1;\n        wm::load_matrix_sync(af,&a[0][kk],BK+8);\n        wm::load_matrix_sync(bf1,&b[warp*16][kk],BK+8);\n        wm::mma_sync(acc,af,bf1,acc);\n        if constexpr(ROUTER) {\n          wm::load_matrix_sync(bf1,&bl[warp*16][kk],BK+8);\n          wm::mma_sync(low,af,bf1,low);\n        }\n      }\n    }\n    __syncthreads();\n  }\n  if(warp<BN/16) {\n    if constexpr(ROUTER) {\n      #pragma unroll\n      for(int i=0;i<acc.num_elements;i++) acc.x[i]+=low.x[i];\n    }\n    wm::store_matrix_sync(&out[0][warp*16],acc,BN,wm::mem_row_major);\n  }\n  __syncthreads();\n  if constexpr(CLUSTER) {\n#if __CUDA_ARCH__ >= 900\n    auto cluster=cooperative_groups::this_cluster();\n    cluster.sync();\n    if(cluster.block_rank()==0) {\n      for(int i=tid;i<16*BN;i+=THREADS) {\n        int r=i/BN,c=i%BN;\n        float v=0;\n        for(int j=0;j<split;j++) {\n          float* remote=cluster.map_shared_rank(&out[0][0],j);\n          v+=remote[i];\n        }\n        if(mo+r<M && no+c<N) {\n          if constexpr(ROUTER) ((float*)y)[(mo+r)*N+no+c]=v;\n          else ((bf*)y)[(mo+r)*N+no+c]=__float2bfloat16_rn(v);\n        }\n      }\n    }\n    cluster.sync();\n#endif\n  } else {\n    for(int i=tid;i<16*BN;i+=THREADS) {\n      int r=i/BN,c=i%BN;\n      if(mo+r<M && no+c<N) p[si*M*N+(mo+r)*N+no+c]=out[r][c];\n    }\n  }\n}\ntemplate<bool FP32>\n__global__ void finish(const float* p,void* y,int size,int split) {\n  int i=blockIdx.x*256+threadIdx.x;\n  if(i<size) {\n    float v=0;\n    for(int s=0;s<split;s++) v+=p[s*size+i];\n    if constexpr(FP32) ((float*)y)[i]=v;\n    else ((bf*)y)[i]=__float2bfloat16_rn(v);\n  }\n}\n__device__ __forceinline__ void mma16(float* c,const uint32_t* a,const uint32_t* b) {\n  asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.bf16.bf16.f32 {%0,%1,%2,%3}, {%4,%5,%6,%7}, {%8,%9}, {%0,%1,%2,%3};"\n    : "+f"(c[0]),"+f"(c[1]),"+f"(c[2]),"+f"(c[3])\n    : "r"(a[0]),"r"(a[1]),"r"(a[2]),"r"(a[3]),"r"(b[0]),"r"(b[1]));\n}\ntemplate<int MB,bool ROUTER>\n__global__ void direct_mma(const bf* __restrict__ x,const bf* __restrict__ w,const bf* __restrict__ lo,\n float* __restrict__ p,int M,int N,int K,int SX,int split) {\n  int tid=threadIdx.x,lane=tid%32,warp=tid/32,g=lane/4,t=lane%4;\n  int nbase=blockIdx.y*64+warp*16,mbase=blockIdx.x*MB,si=blockIdx.z;\n  float acc[MB/8][4]={},low[MB/8][4]={};\n  for(int ko=si*16;ko<K;ko+=split*16) {\n    uint32_t a[4]={},al[4]={};\n    if(nbase+g<N) {\n      a[0]=*(const uint32_t*)(w+(nbase+g)*K+ko+t*2);\n      a[2]=*(const uint32_t*)(w+(nbase+g)*K+ko+t*2+8);\n      if constexpr(ROUTER) {\n        al[0]=*(const uint32_t*)(lo+(nbase+g)*K+ko+t*2);\n        al[2]=*(const uint32_t*)(lo+(nbase+g)*K+ko+t*2+8);\n      }\n    }\n    if(nbase+g+8<N) {\n      a[1]=*(const uint32_t*)(w+(nbase+g+8)*K+ko+t*2);\n      a[3]=*(const uint32_t*)(w+(nbase+g+8)*K+ko+t*2+8);\n      if constexpr(ROUTER) {\n        al[1]=*(const uint32_t*)(lo+(nbase+g+8)*K+ko+t*2);\n        al[3]=*(const uint32_t*)(lo+(nbase+g+8)*K+ko+t*2+8);\n      }\n    }\n    #pragma unroll\n    for(int j=0;j<MB/8;j++) {\n      uint32_t b[2]={};\n      if(mbase+j*8+g<M) {\n        b[0]=*(const uint32_t*)(x+(mbase+j*8+g)*SX+ko+t*2);\n        b[1]=*(const uint32_t*)(x+(mbase+j*8+g)*SX+ko+t*2+8);\n      }\n      mma16(acc[j],a,b);\n      if constexpr(ROUTER) mma16(low[j],al,b);\n    }\n  }\n  #pragma unroll\n  for(int j=0;j<MB/8;j++) {\n    #pragma unroll\n    for(int i=0;i<4;i++) {\n      int nn=nbase+g+(i>=2?8:0),mm=mbase+j*8+2*t+i%2;\n      if(nn<N && mm<M) p[si*M*N+mm*N+nn]=acc[j][i]+(ROUTER?low[j][i]:0.f);\n    }\n  }\n}\n\n// Adapted from SGLang a55ab7d5 Hopper GEMV: shared activations and\n// streaming weight loads. The original project uses the Apache-2.0 license.\ntemplate<int K,int ROWS,int UNROLL,int NW>\n__global__ void stream_gemv(const bf* __restrict__ x,const bf* __restrict__ w,bf* __restrict__ y,int N) {\n  __shared__ __align__(32) bf sx[K];\n  int tid=threadIdx.x,lane=tid%32,warp=tid/32;\n  for(int i=tid*8;i<K;i+=NW*32*8) *(uint4*)(sx+i)=*(const uint4*)(x+i);\n  __syncthreads();\n  int row=(blockIdx.x*NW+warp)*ROWS;\n  float acc[ROWS]={};\n  for(int kk=lane*8*UNROLL;kk<K;kk+=32*8*UNROLL) {\n    uint4 xv[UNROLL];\n    #pragma unroll\n    for(int u=0;u<UNROLL;u++) xv[u]=*(const uint4*)(sx+kk+u*8);\n    #pragma unroll\n    for(int r=0;r<ROWS;r++) {\n      if(row+r<N) {\n        uint4 wv[UNROLL];\n        #pragma unroll\n        for(int u=0;u<UNROLL;u++) wv[u]=__ldcs((const uint4*)(w+(row+r)*K+kk+u*8));\n        #pragma unroll\n        for(int u=0;u<UNROLL;u++) {\n          const __nv_bfloat162* a=(const __nv_bfloat162*)&xv[u];\n          const __nv_bfloat162* b=(const __nv_bfloat162*)&wv[u];\n          float dot=0;\n          #pragma unroll\n          for(int j=0;j<4;j++) {\n            float2 av=__bfloat1622float2(a[j]),bv=__bfloat1622float2(b[j]);\n            dot=fmaf(av.x,bv.x,dot);dot=fmaf(av.y,bv.y,dot);\n          }\n          acc[r]+=dot;\n        }\n      }\n    }\n  }\n  #pragma unroll\n  for(int r=0;r<ROWS;r++) {\n    float v=warp_sum(acc[r]);\n    if(lane==0 && row+r<N) y[row+r]=__float2bfloat16_rn(v);\n  }\n}\nvoid stream_launch(uint64_t x,uint64_t w,uint64_t y,int n,int k,int rows,int unroll,int threads,cudaStream_t s) {\n#define V(K,R,U,W) if(k==K && rows==R && unroll==U && threads==W*32) {stream_gemv<K,R,U,W><<<(n+R*W-1)/(R*W),W*32,0,s>>>((bf*)x,(bf*)w,(bf*)y,n);return;}\n#define VS(K,R,U) V(K,R,U,4) V(K,R,U,8)\n#define VR(K,R) VS(K,R,1) VS(K,R,2) VS(K,R,4)\n#define VK(K) VR(K,1) VR(K,2) VR(K,4)\n  VK(1024) VK(4096) VK(8192)\n  throw std::runtime_error("unsupported streamed GEMV configuration");\n}\n\nvoid gemv(uint64_t x,uint64_t w,uint64_t y,int n,int k,int rows,int threads,bool fp,uint64_t stream) {\n  cudaStream_t s=(cudaStream_t)stream;\n  if(rows>=100) {int code=rows-100;stream_launch(x,w,y,n,k,code/10,code%10,threads,s);return;}\n#define GV(R,T) if(rows==R && threads==T) {if(fp) vec_gemv<true,R,T><<<(n+R-1)/R,T,0,s>>>((bf*)x,(void*)w,(void*)y,n,k);else vec_gemv<false,R,T><<<(n+R-1)/R,T,0,s>>>((bf*)x,(void*)w,(void*)y,n,k);return;}\n  GV(1,128) GV(1,256) GV(4,128) GV(8,256) GV(2,128)\n  throw std::runtime_error("unsupported gemv configuration");\n}\nvoid gemm(uint64_t x,uint64_t w,uint64_t lo,uint64_t p,uint64_t y,int m,int n,int k,int sx,int bn,int bk,int split,bool router,uint64_t stream) {\n  cudaStream_t s=(cudaStream_t)stream;\n  if(bk==16) {\n    int mb=bn;\n    dim3 grid((m+mb-1)/mb,(n+63)/64,split);\n#define DM(B) if(mb==B) {if(router) direct_mma<B,true><<<grid,128,0,s>>>((bf*)x,(bf*)w,(bf*)lo,(float*)p,m,n,k,sx,split);else direct_mma<B,false><<<grid,128,0,s>>>((bf*)x,(bf*)w,(bf*)lo,(float*)p,m,n,k,sx,split);}\n    DM(8) else DM(16) else DM(32) else throw std::runtime_error("unsupported direct configuration");\n    if(router) finish<true><<<(m*n+255)/256,256,0,s>>>((float*)p,(void*)y,m*n,split);\n    else finish<false><<<(m*n+255)/256,256,0,s>>>((float*)p,(void*)y,m*n,split);\n    return;\n  }\n  bool cluster=split<0;\n  if(cluster) split=-split;\n  dim3 grid((m+15)/16,(n+bn-1)/bn,split);\n  if(cluster) {\n    cudaLaunchConfig_t cfg={};\n    cfg.gridDim=grid;cfg.blockDim=dim3(128);cfg.stream=s;\n    cudaLaunchAttribute attr={};\n    attr.id=cudaLaunchAttributeClusterDimension;\n    attr.val.clusterDim.x=1;attr.val.clusterDim.y=1;attr.val.clusterDim.z=split;\n    cfg.attrs=&attr;cfg.numAttrs=1;\n#define GC(N,K) if(bn==N && bk==K) {cudaError_t e; if(router) e=cudaLaunchKernelEx(&cfg,small_gemm<N,K,128,true,true>,(const bf*)x,(const bf*)w,(const bf*)lo,(float*)p,(void*)y,m,n,k,sx,split);else e=cudaLaunchKernelEx(&cfg,small_gemm<N,K,128,false,true>,(const bf*)x,(const bf*)w,(const bf*)lo,(float*)p,(void*)y,m,n,k,sx,split); if(e!=cudaSuccess) throw std::runtime_error(cudaGetErrorString(e));return;}\n    GC(16,64) GC(32,64) GC(64,64) GC(16,128) GC(32,128) GC(64,128)\n    throw std::runtime_error("unsupported cluster configuration");\n  }\n#define GM(N,K) if(bn==N && bk==K) {if(router) small_gemm<N,K,128,true><<<grid,128,0,s>>>((bf*)x,(bf*)w,(bf*)lo,(float*)p,(void*)y,m,n,k,sx,split);else small_gemm<N,K,128,false><<<grid,128,0,s>>>((bf*)x,(bf*)w,(bf*)lo,(float*)p,(void*)y,m,n,k,sx,split);}\n  GM(16,64) else GM(32,64) else GM(64,64) else GM(16,128) else GM(32,128) else GM(64,128) else throw std::runtime_error("unsupported gemm configuration");\n  if(router) finish<true><<<(m*n+255)/256,256,0,s>>>((float*)p,(void*)y,m*n,split);\n  else finish<false><<<(m*n+255)/256,256,0,s>>>((float*)p,(void*)y,m*n,split);\n}\ntemplate<int MT,int T>\n__global__ void router_simt(const bf* __restrict__ x,const float* __restrict__ w,float* __restrict__ y,int M,int N,int K,int SX) {\n  int n=blockIdx.x,mo=blockIdx.y*MT,tid=threadIdx.x;\n  float acc[MT]={};\n  for(int ko=tid*8;ko<K;ko+=T*8) {\n    float4 w0=__ldg((const float4*)(w+n*K+ko));\n    float4 w1=__ldg((const float4*)(w+n*K+ko+4));\n    float wv[8]={w0.x,w0.y,w0.z,w0.w,w1.x,w1.y,w1.z,w1.w};\n    #pragma unroll\n    for(int m=0;m<MT;m++) {\n      if(mo+m<M) {\n        uint4 xv=*(const uint4*)(x+(mo+m)*SX+ko);\n        bf* xb=(bf*)&xv;\n        float dot=0;\n        #pragma unroll\n        for(int j=0;j<8;j++) dot=fmaf(wv[j],__bfloat162float(xb[j]),dot);\n        acc[m]+=dot;\n      }\n    }\n  }\n  __shared__ float sm[MT][T/32];\n  #pragma unroll\n  for(int m=0;m<MT;m++) {\n    float v=warp_sum(acc[m]);\n    if(tid%32==0) sm[m][tid/32]=v;\n  }\n  __syncthreads();\n  if(tid<MT && mo+tid<M) {\n    float v=0;\n    #pragma unroll\n    for(int j=0;j<T/32;j++) v+=sm[tid][j];\n    y[(mo+tid)*N+n]=v;\n  }\n}\nvoid simt(uint64_t x,uint64_t w,uint64_t y,int m,int n,int k,int sx,int mt,int threads,uint64_t stream) {\n#define SI(M,T) if(mt==M && threads==T) {router_simt<M,T><<<dim3(n,(m+M-1)/M),T,0,(cudaStream_t)stream>>>((bf*)x,(float*)w,(float*)y,m,n,k,sx);return;}\n SI(2,128) SI(4,128) SI(8,128) SI(16,128) SI(2,256) SI(4,256) SI(8,256) SI(16,256)\n throw std::runtime_error("unsupported SIMT configuration");\n}\ntemplate<int ROWS,int THREADS>\n__global__ void compressed_gemv(const bf* __restrict__ x,const uint8_t* __restrict__ sm,\n const uint8_t* __restrict__ ex,const bf* __restrict__ original,bf* __restrict__ y,int N,int K,int base) {\n  int tid=threadIdx.x,lane=tid%32,warp=tid/32;\n  constexpr int GROUP=THREADS/ROWS;\n  int row=blockIdx.x*ROWS+tid/GROUP,t=tid%GROUP;\n  float acc=0;\n  if(row<N) for(int k=t*8;k<K;k+=GROUP*8) {\n    uint2 packed=__ldcs((const uint2*)(sm+row*K+k));\n    uint32_t codes=__ldcs((const uint32_t*)(ex+(row*K+k)/2));\n    uint4 xv=*(const uint4*)(x+k);\n    const __nv_bfloat162* xp=(const __nv_bfloat162*)&xv;\n    uint8_t* mant=(uint8_t*)&packed;\n    #pragma unroll\n    for(int i=0;i<4;i++) {\n      int c0=(codes>>(i*8))&15,c1=(codes>>(i*8+4))&15;\n      uint32_t b0=(mant[2*i]&127)|((mant[2*i]&128)<<8)|((base+c0)<<7);\n      uint32_t b1=(mant[2*i+1]&127)|((mant[2*i+1]&128)<<8)|((base+c1)<<7);\n      if(c0==15) b0=((const uint16_t*)original)[row*K+k+2*i];\n      if(c1==15) b1=((const uint16_t*)original)[row*K+k+2*i+1];\n      uint32_t bits=b0|(b1<<16);\n      float2 w=__bfloat1622float2(*(const __nv_bfloat162*)&bits),a=__bfloat1622float2(xp[i]);\n      acc=fmaf(w.x,a.x,acc);acc=fmaf(w.y,a.y,acc);\n    }\n  }\n  acc=warp_sum(acc);\n  if constexpr(GROUP==32) {\n    if(lane==0 && row<N)y[row]=__float2bfloat16_rn(acc);\n  } else {\n    __shared__ float sums[THREADS/32];\n    if(lane==0)sums[warp]=acc;\n    __syncthreads();\n    if(t==0 && row<N) {\n      float v=0;\n      #pragma unroll\n      for(int j=0;j<GROUP/32;j++)v+=sums[tid/GROUP*(GROUP/32)+j];\n      y[row]=__float2bfloat16_rn(v);\n    }\n  }\n}\nvoid compressed(uint64_t x,uint64_t sm,uint64_t ex,uint64_t orig,uint64_t y,int n,int k,int rows,int threads,int base,uint64_t stream) {\n#define CV(R,T) if(rows==R && threads==T) {compressed_gemv<R,T><<<(n+R-1)/R,T,0,(cudaStream_t)stream>>>((bf*)x,(uint8_t*)sm,(uint8_t*)ex,(bf*)orig,(bf*)y,n,k,base);return;}\n CV(1,128) CV(1,256) CV(2,128) CV(4,128) CV(8,256)\n throw std::runtime_error("unsupported compressed configuration");\n}\n\nvoid reduce(uint64_t p,uint64_t y,int size,int split,bool fp,uint64_t stream) {\n if(fp) finish<true><<<(size+255)/256,256,0,(cudaStream_t)stream>>>((float*)p,(void*)y,size,split);\n else finish<false><<<(size+255)/256,256,0,(cudaStream_t)stream>>>((float*)p,(void*)y,size,split);\n}\n__global__ void combine_kernel(const float* __restrict__ p,float* __restrict__ y,int M,int N,bool interleave) {\n  int i=blockIdx.x*256+threadIdx.x;\n  if(i<M*N) {\n    int m=i/N,n=i%N;\n    if(interleave) y[i]=p[m*(2*N)+n*2]+p[m*(2*N)+n*2+1];\n    else y[i]=p[m*(2*N)+n]+p[m*(2*N)+N+n];\n  }\n}\nvoid combine(uint64_t p,uint64_t y,int m,int n,bool interleave,uint64_t stream) {\n combine_kernel<<<(m*n+255)/256,256,0,(cudaStream_t)stream>>>((float*)p,(float*)y,m,n,interleave);\n}\ntemplate<int BN> __device__ __forceinline__ void wg(float*,uint64_t,uint64_t);\n\n__device__ __forceinline__ uint64_t gmma_desc(const bf* p,int BK) {\n uint64_t addr=__cvta_generic_to_shared(p);\n return (addr>>4)|((uint64_t(128)>>4)<<16)|((uint64_t(8*BK*2)>>4)<<32);\n}\ntemplate<> __device__ __forceinline__ void wg<32>(float* c,uint64_t a,uint64_t b) {\n#if __CUDA_ARCH__ >= 900\n asm volatile("{.reg .pred p; setp.ne.b32 p, 1, 0; wgmma.mma_async.sync.aligned.m64n32k16.f32.bf16.bf16 {%0,%1,%2,%3,%4,%5,%6,%7,%8,%9,%10,%11,%12,%13,%14,%15}, %16, %17, p, 1, 1, 0, 0;}"\n :"+f"(c[0]),"+f"(c[1]),"+f"(c[2]),"+f"(c[3]),"+f"(c[4]),"+f"(c[5]),"+f"(c[6]),"+f"(c[7]),"+f"(c[8]),"+f"(c[9]),"+f"(c[10]),"+f"(c[11]),"+f"(c[12]),"+f"(c[13]),"+f"(c[14]),"+f"(c[15]):"l"(a),"l"(b));\n#endif\n}\ntemplate<> __device__ __forceinline__ void wg<64>(float* c,uint64_t a,uint64_t b) {\n#if __CUDA_ARCH__ >= 900\n asm volatile("{.reg .pred p; setp.ne.b32 p, 1, 0; wgmma.mma_async.sync.aligned.m64n64k16.f32.bf16.bf16 {%0,%1,%2,%3,%4,%5,%6,%7,%8,%9,%10,%11,%12,%13,%14,%15,%16,%17,%18,%19,%20,%21,%22,%23,%24,%25,%26,%27,%28,%29,%30,%31}, %32, %33, p, 1, 1, 0, 0;}"\n :"+f"(c[0]),"+f"(c[1]),"+f"(c[2]),"+f"(c[3]),"+f"(c[4]),"+f"(c[5]),"+f"(c[6]),"+f"(c[7]),"+f"(c[8]),"+f"(c[9]),"+f"(c[10]),"+f"(c[11]),"+f"(c[12]),"+f"(c[13]),"+f"(c[14]),"+f"(c[15]),"+f"(c[16]),"+f"(c[17]),"+f"(c[18]),"+f"(c[19]),"+f"(c[20]),"+f"(c[21]),"+f"(c[22]),"+f"(c[23]),"+f"(c[24]),"+f"(c[25]),"+f"(c[26]),"+f"(c[27]),"+f"(c[28]),"+f"(c[29]),"+f"(c[30]),"+f"(c[31]):"l"(a),"l"(b));\n#endif\n}\n\ntemplate<int BN,int BK>\n__global__ void warpgroup_gemm(const bf* __restrict__ x,const bf* __restrict__ w,const bf* __restrict__ lo,\n float* __restrict__ p,int M,int N,int K,int SX,int split) {\n#if __CUDA_ARCH__ >= 900\n __shared__ __align__(128) bf a[64*BK],b[BN*BK],bl[BN*BK];\n int tid=threadIdx.x,mo=blockIdx.x*64,no=blockIdx.y*BN,si=blockIdx.z;\n float acc[BN/2]={},low[BN/2]={};\n for(int ko=si*BK;ko<K;ko+=split*BK) {\n   for(int i=tid;i<64*BK/8;i+=128) {\n     int r=i/(BK/8),c=(i%(BK/8))*8;\n     int off=(r/8)*(8*BK)+(c/8)*64+(r%8)*8;\n     cp16(a+off,x+(mo+r)*SX+ko+c,mo+r<M && ko+c<K);\n   }\n   for(int i=tid;i<BN*BK/8;i+=128) {\n     int r=i/(BK/8),c=(i%(BK/8))*8;\n     int off=(r/8)*(8*BK)+(c/8)*64+(r%8)*8;\n     cp16(b+off,w+(no+r)*K+ko+c,no+r<N && ko+c<K);\n     cp16(bl+off,lo+(no+r)*K+ko+c,no+r<N && ko+c<K);\n   }\n   cpwait();\n   asm volatile("fence.proxy.async.shared::cta;":::"memory");\n   asm volatile("wgmma.fence.sync.aligned;":::"memory");\n   #pragma unroll\n   for(int kk=0;kk<BK;kk+=16) {\n     uint64_t ad=gmma_desc(a+(kk/8)*64,BK),bd=gmma_desc(b+(kk/8)*64,BK),ld=gmma_desc(bl+(kk/8)*64,BK);\n     wg<BN>(acc,ad,bd);wg<BN>(low,ad,ld);\n   }\n   asm volatile("wgmma.commit_group.sync.aligned; wgmma.wait_group.sync.aligned 0;":::"memory");\n   __syncthreads();\n }\n int lane=tid%32,warp=tid/32;\n #pragma unroll\n for(int i=0;i<BN/2;i++) {\n   int r=warp*16+lane/4+(i%4>=2?8:0),c=(lane%4)*2+i%2+(i/4)*8;\n   if(mo+r<M && no+c<N) p[si*M*N+(mo+r)*N+no+c]=acc[i]+low[i];\n }\n#endif\n}\nvoid wgmma(uint64_t x,uint64_t w,uint64_t lo,uint64_t p,uint64_t y,int m,int n,int k,int sx,int bn,int bk,int split,uint64_t stream) {\n cudaStream_t s=(cudaStream_t)stream;\n dim3 grid((m+63)/64,(n+bn-1)/bn,split);\n#define WG(N,K) if(bn==N && bk==K) warpgroup_gemm<N,K><<<grid,128,0,s>>>((bf*)x,(bf*)w,(bf*)lo,(float*)(split==1?y:p),m,n,k,sx,split);\n WG(32,64) else WG(32,128) else WG(64,64) else WG(64,128) else throw std::runtime_error("unsupported WGMMA configuration");\n if(split>1) finish<true><<<(m*n+255)/256,256,0,s>>>((float*)p,(void*)y,m*n,split);\n}\n'
+
+
+def _run(x,layer,n,state,tactic):
+    m,k=x.shape
+    router=layer=="router"
+    if tactic[0]=="torch":
+        w=state["transposed"][layer][:,:n] if tactic[1] else state[layer][:n].T
+        return torch.mm(x.float() if router else x,w)
+    out=torch.empty((m,n),device=x.device,dtype=torch.float32 if router else torch.bfloat16)
+    if tactic[0]=='wg':
+        bn,bk,split=tactic[1:]
+        p=torch.empty((split,m,n),device=x.device,dtype=torch.float32) if split>1 else out
+        state['ext'].wgmma(x.data_ptr(),state['hi'].data_ptr(),state['lo'].data_ptr(),p.data_ptr(),out.data_ptr(),m,n,k,x.stride(0),bn,bk,split,torch.cuda.current_stream(x.device).cuda_stream)
+        return out
+    if tactic[0]=="cp":
+        sm,ex,base=state['packed'][layer]
+        state['ext'].compressed(x.data_ptr(),sm.data_ptr(),ex.data_ptr(),state[layer].data_ptr(),out.data_ptr(),n,k,tactic[1],tactic[2],base,torch.cuda.current_stream(x.device).cuda_stream)
+        return out
+    if tactic[0]=="simt":
+        state['ext'].simt(x.data_ptr(),state[layer].data_ptr(),out.data_ptr(),m,n,k,x.stride(0),tactic[1],tactic[2],torch.cuda.current_stream(x.device).cuda_stream)
+        return out
+    if tactic[0]=="deep":
+        dg=state["dg"]
+        old_sms,old_det=dg.get_num_sms(),dg.get_deterministic_algorithms()
+        try:
+            dg.use_deterministic_algorithms(True)
+            dg.set_num_sms(tactic[1])
+            dg.bf16_gemm_nt(x,state[layer][:n],out)
+        finally:
+            dg.set_num_sms(old_sms);dg.use_deterministic_algorithms(old_det)
+        return out
+    ext=state["ext"]
+    stream=torch.cuda.current_stream(x.device).cuda_stream
+    if tactic[0]=="v":
+        ext.gemv(x.data_ptr(),state[layer].data_ptr(),out.data_ptr(),n,k,tactic[1],tactic[2],router,stream)
+    else:
+        bn,bk,split=tactic[1:]
+        p=torch.empty((max(1,split),m,n),device=x.device,dtype=torch.float32) if split>0 else out
+        w=state["hi"] if router else state[layer]
+        lo=state["lo"] if router else w
+        ext.gemm(x.data_ptr(),w.data_ptr(),lo.data_ptr(),p.data_ptr(),out.data_ptr(),m,n,k,x.stride(0),bn,bk,split,router,stream)
+    return out
+
+
+_BASE = {('qkv_gate', 1): ('v', 112, 256), ('qkv_gate', 8): ('torch', False), ('qkv_gate', 16): ('torch', True), ('qkv_gate', 32): ('torch', True), ('qkv_gate', 128): ('deep', 128), ('qkv_gate', 256): ('deep', 128), ('o', 1): ('v', 112, 128), ('o', 8): ('torch', True), ('o', 16): ('torch', True), ('o', 32): ('torch', True), ('o', 128): ('torch', True), ('o', 256): ('torch', True), ('pooler', 1): ('v', 114, 256), ('pooler', 8): ('torch', True), ('pooler', 16): ('deep', 132), ('pooler', 32): ('deep', 128), ('pooler', 128): ('deep', 128), ('pooler', 256): ('torch', True), ('unpooler', 1): ('v', 1, 128), ('unpooler', 8): ('torch', False), ('unpooler', 16): ('torch', True), ('unpooler', 32): ('torch', True), ('unpooler', 128): ('torch', True), ('unpooler', 256): ('torch', False), ('router', 1): ('v', 1, 256), ('router', 8): ('simt', 4, 256), ('router', 16): ('g', 16, 128, 32), ('router', 32): ('g', 32, 128, 32), ('router', 128): ('g', 64, 128, 32), ('router', 256): ('g', 64, 128, 32)}
+
+def prepare(weights: Weights):
+    import statistics,json
+    from torch.utils.cpp_extension import load_inline
+    state={name:w.contiguous() for name,w in weights.items()}
+    state["ext"]=load_inline(name="muse_cuda_v25",cpp_sources=_CPP,cuda_sources=_CUDA,
+        functions=None,with_cuda=True,no_implicit_headers=True,extra_cflags=["-O3"],
+        extra_cuda_cflags=["-O3","--expt-relaxed-constexpr","-gencode=arch=compute_90a,code=sm_90a"],verbose=False)
+    state["transposed"]={name:w.T.contiguous() for name,w in weights.items()}
+    state["hi"]=state["router"].bfloat16()
+    state["lo"]=(state["router"]-state["hi"].float()).bfloat16()
+    state["dg"]=None
+    if torch.cuda.get_device_capability()[0]==9:
+        try:
+            import deep_gemm
+            state["dg"]=deep_gemm
+            from pathlib import Path
+            print("CUTLASS_HEADERS",str(Path(deep_gemm.__file__).parent/'include'),(Path(deep_gemm.__file__).parent/'include/cutlass/cutlass.h').exists(),flush=True)
+        except ImportError:
+            pass
+    state['packed']={}
+    for layer,w in weights.items():
+        if layer=='router':continue
+        bits=w.view(torch.int16).int()&65535
+        exponent=(bits>>7)&255
+        base=112
+        code=torch.where((exponent>=base)&(exponent<base+15),exponent-base,15).to(torch.uint8)
+        mant=((bits&127)|((bits>>8)&128)).to(torch.uint8).contiguous()
+        codes=(code[:,0::2]|(code[:,1::2]<<4)).contiguous()
+        state['packed'][layer]=(mant,codes,base)
+        restored=((mant.int()&127)|((mant.int()&128)<<8))
+        unpack=torch.stack((codes&15,codes>>4),dim=-1).reshape(w.shape).int()
+        restored|=(unpack+base)<<7
+        restored=torch.where(unpack==15,bits,restored)
+        assert torch.equal(bits,restored),"lossless BF16 packing"
+    flush=torch.empty(64*1024*1024,device=state["router"].device,dtype=torch.uint8)
+    state["choices"]={}
+    for layer,w in weights.items():
+        for m in (1,8,16,32,128,256):
+            n,k=w.shape
+            if layer=='unpooler' and m<=8:n=1024
+            router=layer=='router'
+            x=torch.randn((m,k),device=w.device,dtype=torch.bfloat16)
+            ref=(x.double() @ w[:n].double().T).to(torch.float32 if router else torch.bfloat16)
+            choices=[_BASE[(layer,m)]]
+            if router:
+                choices += [('wg',bn,bk,sp) for bn,bk in [(32,64),(32,128),(64,64),(64,128)] for sp in (1,4,8,16,32)]
+            results=[]
+            for tactic in choices:
+                out=_run(x,layer,n,state,tactic)
+                err=((out.float()-ref.float()).norm()/ref.float().norm()).item()
+                if err>(1e-4 if router else .01):
+                    print('BAD',layer,m,tactic,err,flush=True)
+                    continue
+                graph=torch.cuda.CUDAGraph()
+                start=torch.cuda.Event(enable_timing=True,external=True)
+                end=torch.cuda.Event(enable_timing=True,external=True)
+                with torch.cuda.graph(graph):
+                    flush.zero_(); start.record()
+                    out=_run(x,layer,n,state,tactic)
+                    end.record()
+                times=[]
+                for _ in range(7):
+                    graph.replay();end.synchronize();times.append(start.elapsed_time(end)*1000)
+                results.append((statistics.median(times),tactic))
+            results.sort()
+            state['choices'][(layer,m,n,k)]=results[0][1]
+            print('CUDA25_TUNE',json.dumps({'layer':layer,'m':m,'best':results[:6],'torch':[r for r in results if r[1][0]=='torch']}),flush=True)
+    return state
+
+
+def kernel_fn(data: Inputs,state):
+    x=data['x'];m,k=x.shape
+    layer,n=data['config']['layer'],data['config']['n']
+    router=layer=='router'
+    if m==0 or n==0:return torch.empty((m,n),device=x.device,dtype=torch.float32 if router else torch.bfloat16)
+    if x.stride(1)!=1 or x.data_ptr()%16 or x.stride(0)*2%16 or k%8:
+        return torch.mm(x.float() if router else x,state[layer][:n].T)
+    choice=state['choices'].get((layer,m,n,k))
+    if choice is None:
+        choice=('v',1,128) if m==1 else ('g',32,128,16) if router else ('torch',False)
+    return _run(x,layer,n,state,choice)
