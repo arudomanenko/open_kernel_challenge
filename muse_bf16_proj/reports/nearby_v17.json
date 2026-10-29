@@ -1,0 +1,330 @@
+{
+  "job": "2cd2938cbe074b01",
+  "native_layout_checks": 21,
+  "configuration_restored": true,
+  "timing": "Diagnostic cold-cache CUDA-graph events; not official per-case scores.",
+  "cases": [
+    {
+      "layer": "qkv_gate",
+      "m": 4,
+      "results": [
+        {
+          "tactic": [
+            "torch",
+            false
+          ],
+          "us": 21.056000143289566
+        },
+        {
+          "tactic": [
+            "raw",
+            16,
+            32,
+            256,
+            4,
+            4,
+            3
+          ],
+          "us": 20.67199908196926
+        }
+      ]
+    },
+    {
+      "layer": "qkv_gate",
+      "m": 7,
+      "results": [
+        {
+          "tactic": [
+            "torch",
+            false
+          ],
+          "us": 20.864000543951988
+        },
+        {
+          "tactic": [
+            "raw",
+            16,
+            32,
+            256,
+            4,
+            4,
+            3
+          ],
+          "us": 20.576000213623047
+        }
+      ]
+    },
+    {
+      "layer": "pooler",
+      "m": 4,
+      "results": [
+        {
+          "tactic": [
+            "torch",
+            false
+          ],
+          "us": 29.952000826597214
+        },
+        {
+          "tactic": [
+            "torch",
+            true
+          ],
+          "us": 29.440000653266907
+        },
+        {
+          "tactic": [
+            "packed",
+            16,
+            64,
+            128,
+            4,
+            4,
+            3
+          ],
+          "us": 28.64000014960766
+        }
+      ]
+    },
+    {
+      "layer": "pooler",
+      "m": 7,
+      "results": [
+        {
+          "tactic": [
+            "torch",
+            false
+          ],
+          "us": 30.17600066959858
+        },
+        {
+          "tactic": [
+            "torch",
+            true
+          ],
+          "us": 29.37600016593933
+        },
+        {
+          "tactic": [
+            "packed",
+            16,
+            64,
+            128,
+            4,
+            4,
+            3
+          ],
+          "us": 28.9280004799366
+        }
+      ]
+    },
+    {
+      "layer": "pooler",
+      "m": 15,
+      "results": [
+        {
+          "tactic": [
+            "torch",
+            false
+          ],
+          "us": 30.112000182271004
+        },
+        {
+          "tactic": [
+            "torch",
+            true
+          ],
+          "us": 29.24799919128418
+        },
+        {
+          "tactic": [
+            "deep"
+          ],
+          "us": 28.543999418616295
+        }
+      ]
+    },
+    {
+      "layer": "pooler",
+      "m": 17,
+      "results": [
+        {
+          "tactic": [
+            "torch",
+            false
+          ],
+          "us": 30.368000268936157
+        },
+        {
+          "tactic": [
+            "torch",
+            true
+          ],
+          "us": 29.69600073993206
+        },
+        {
+          "tactic": [
+            "deep"
+          ],
+          "us": 28.896000236272812
+        }
+      ]
+    },
+    {
+      "layer": "pooler",
+      "m": 33,
+      "results": [
+        {
+          "tactic": [
+            "torch",
+            false
+          ],
+          "us": 30.880000442266464
+        },
+        {
+          "tactic": [
+            "torch",
+            true
+          ],
+          "us": 29.983999207615852
+        },
+        {
+          "tactic": [
+            "deep"
+          ],
+          "us": 37.728000432252884
+        }
+      ]
+    },
+    {
+      "layer": "pooler",
+      "m": 129,
+      "results": [
+        {
+          "tactic": [
+            "torch",
+            false
+          ],
+          "us": 31.328000128269196
+        },
+        {
+          "tactic": [
+            "torch",
+            true
+          ],
+          "us": 31.295999884605408
+        },
+        {
+          "tactic": [
+            "deep"
+          ],
+          "us": 46.39999940991402
+        }
+      ]
+    },
+    {
+      "layer": "unpooler",
+      "m": 4,
+      "results": [
+        {
+          "tactic": [
+            "torch",
+            false
+          ],
+          "us": 11.455999687314034
+        },
+        {
+          "tactic": [
+            "torch",
+            true
+          ],
+          "us": 11.455999687314034
+        },
+        {
+          "tactic": [
+            "raw",
+            16,
+            32,
+            256,
+            4,
+            4,
+            3
+          ],
+          "us": 11.359999887645245
+        }
+      ]
+    },
+    {
+      "layer": "unpooler",
+      "m": 7,
+      "results": [
+        {
+          "tactic": [
+            "torch",
+            false
+          ],
+          "us": 11.615999974310398
+        },
+        {
+          "tactic": [
+            "torch",
+            true
+          ],
+          "us": 11.552000418305397
+        },
+        {
+          "tactic": [
+            "raw",
+            16,
+            32,
+            256,
+            4,
+            4,
+            3
+          ],
+          "us": 11.52000017464161
+        }
+      ]
+    },
+    {
+      "layer": "unpooler",
+      "m": 17,
+      "results": [
+        {
+          "tactic": [
+            "torch",
+            false
+          ],
+          "us": 28.31999957561493
+        },
+        {
+          "tactic": [
+            "torch",
+            true
+          ],
+          "us": 27.23200060427189
+        }
+      ]
+    },
+    {
+      "layer": "unpooler",
+      "m": 129,
+      "results": [
+        {
+          "tactic": [
+            "torch",
+            false
+          ],
+          "us": 30.239999294281006
+        },
+        {
+          "tactic": [
+            "torch",
+            true
+          ],
+          "us": 30.01599945127964
+        }
+      ]
+    }
+  ]
+}

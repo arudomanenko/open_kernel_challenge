@@ -5,10 +5,16 @@ BF16 weights retain their original values. Only the router uses the explicitly
 permitted BF16 hi/lo representation, with separate FP32 accumulators.
 """
 from typing import TypedDict
+from threading import RLock
 
 import torch
 import triton as tr
 import triton.language as tl
+
+
+# Serialize configuration and launch among callers of this module. External
+# DeepGEMM users must coordinate separately if they change runtime settings.
+_DEEP_LOCK = RLock()
 
 
 class Weights(TypedDict):
@@ -101,17 +107,17 @@ _TACTICS = {('qkv_gate', 1, 2304, 8192): ('gemv', 1, 4),
  ('qkv_gate', 8, 2304, 8192): ('raw', 16, 32, 256, 4, 4, 3),
  ('qkv_gate', 16, 2304, 8192): ('torch', False),
  ('qkv_gate', 32, 2304, 8192): ('torch', False),
- ('qkv_gate', 128, 2304, 8192): ('deepcfg', 128, 1),
+ ('qkv_gate', 128, 2304, 8192): ('deepcfg', 128),
  ('qkv_gate', 256, 2304, 8192): ('deep',),
  ('o', 1, 8192, 1024): ('gemv', 4, 4),
- ('o', 8, 8192, 1024): ('torch', True),
- ('o', 16, 8192, 1024): ('torch', True),
- ('o', 32, 8192, 1024): ('torch', True),
- ('o', 128, 8192, 1024): ('torch', True),
+ ('o', 8, 8192, 1024): ('torch', False),
+ ('o', 16, 8192, 1024): ('torch', False),
+ ('o', 32, 8192, 1024): ('torch', False),
+ ('o', 128, 8192, 1024): ('torch', False),
  ('o', 256, 8192, 1024): ('torch', False),
  ('pooler', 1, 4096, 8192): ('sglang',),
  ('pooler', 8, 4096, 8192): ('packed', 16, 64, 128, 4, 4, 3),
- ('pooler', 16, 4096, 8192): ('deepcfg', 128, 1),
+ ('pooler', 16, 4096, 8192): ('deepcfg', 128),
  ('pooler', 32, 4096, 8192): ('deep',),
  ('pooler', 128, 4096, 8192): ('deep',),
  ('pooler', 256, 4096, 8192): ('torch', True),
@@ -120,7 +126,7 @@ _TACTICS = {('qkv_gate', 1, 2304, 8192): ('gemv', 1, 4),
  ('unpooler', 16, 8192, 4096): ('torch', True),
  ('unpooler', 32, 8192, 4096): ('torch', True),
  ('unpooler', 128, 8192, 4096): ('torch', True),
- ('unpooler', 256, 8192, 4096): ('deepcfg', 132, 64),
+ ('unpooler', 256, 8192, 4096): ('deepcfg', 132),
  ('router', 1, 256, 8192): ('gemv', 1, 8),
  ('router', 8, 256, 8192): ('raw', 16, 32, 128, 16, 4, 3),
  ('router', 16, 256, 8192): ('raw', 16, 32, 128, 16, 4, 3),
@@ -136,6 +142,12 @@ def _execute(x, layer, n, state, tactic):
     if kind == "torch":
         w = state["transposed"][layer][:, :n] if tactic[1] else state[layer][:n].T
         return torch.mm(x, w)
+    # Native kernels require aligned, dense activations and weights. Route
+    # unusual views through the general library path without copying inputs.
+    native_layout = (x.is_contiguous() and x.data_ptr() % 16 == 0
+                     and state[layer].data_ptr() % 16 == 0)
+    if kind in ("deep", "deepcfg", "sglang") and not native_layout:
+        return torch.mm(x, state[layer][:n].T)
     if kind == "sglang" and state["gemv"] is not None:
         return state["gemv"](x, state[layer][:n])
     if kind in ("deep", "deepcfg") and state["deep"] is None:
@@ -143,11 +155,18 @@ def _execute(x, layer, n, state, tactic):
     out = torch.empty((m, n), device=x.device,
                       dtype=torch.float32 if router else torch.bfloat16)
     if kind in ("deep", "deepcfg"):
-        sms, multiple = (state["sms"], 1) if kind == "deep" else tactic[1:]
+        sms = state["sms"] if kind == "deep" else min(tactic[1], state["sms"])
         dg = state["deep_module"]
-        dg.set_num_sms(min(sms, state["sms"]))
-        dg.set_block_size_multiple_of((1, multiple))
-        state["deep"](x, state[layer][:n], out)
+        with _DEEP_LOCK:
+            old_sms = dg.get_num_sms()
+            old_deterministic = dg.get_deterministic_algorithms()
+            try:
+                dg.set_num_sms(sms)
+                dg.use_deterministic_algorithms(True)
+                state["deep"](x, state[layer][:n], out)
+            finally:
+                dg.use_deterministic_algorithms(old_deterministic)
+                dg.set_num_sms(old_sms)
         return out
     if kind in ("gemv", "sglang"):
         bn, warps = (1, 4) if kind == "sglang" else tactic[1:]
@@ -189,7 +208,10 @@ def prepare(weights: Weights):
             pass
         try:
             import deep_gemm
-            deep_gemm.use_deterministic_algorithms(True)
+            # Check all required public APIs before enabling this backend.
+            for api in ("get_num_sms", "set_num_sms",
+                        "get_deterministic_algorithms", "use_deterministic_algorithms"):
+                getattr(deep_gemm, api)
             state["deep_module"] = deep_gemm
             state["deep"] = deep_gemm.bf16_gemm_nt
         except (ImportError, AttributeError):
@@ -200,9 +222,6 @@ def prepare(weights: Weights):
         if tactic[0] in ("sglang", "deep", "deepcfg"):
             x = torch.zeros((m, k), device=state[layer].device, dtype=torch.bfloat16)
             _execute(x, layer, n, state, tactic)
-    if state["deep"] is not None:
-        state["deep_module"].set_num_sms(state["sms"])
-        state["deep_module"].set_block_size_multiple_of((1, 1))
     return state
 
 
@@ -222,6 +241,12 @@ def kernel_fn(data: Inputs, state) -> torch.Tensor:
             tactic = (("gemv", 1, 8) if m == 1 else
                       ("raw", 16, 32, 128, 16, 4, 3) if m <= 32 else
                       ("raw", 64, 32, 128, 16, 4, 3))
+        elif layer == "pooler" and (n, k) == (4096, 8192) and 2 <= m <= 32:
+            # Nearby H200 measurements support this small-batch range. Do not
+            # extend native dispatch beyond 32: tile tails regressed at 33/129.
+            tactic = (("packed", 16, 64, 128, 4, 4, 3) if m <= 8 else ("deep",))
+        elif layer == "unpooler" and (n, k) == (8192, 4096) and 9 <= m <= 32:
+            tactic = ("torch", True)
         else:
             return torch.mm(x, state[layer][:n].T)
     return _execute(x, layer, n, state, tactic)

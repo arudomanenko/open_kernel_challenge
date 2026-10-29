@@ -52,8 +52,7 @@
     "k": 8192,
     "backend": "native DeepGEMM SM90 with tuned scheduling",
     "parameters": [
-      128,
-      1
+      128
     ]
   },
   {
@@ -82,7 +81,7 @@
     "k": 1024,
     "backend": "cuBLAS / cuBLASLt via torch.mm",
     "parameters": [
-      true
+      false
     ]
   },
   {
@@ -92,7 +91,7 @@
     "k": 1024,
     "backend": "cuBLAS / cuBLASLt via torch.mm",
     "parameters": [
-      true
+      false
     ]
   },
   {
@@ -102,7 +101,7 @@
     "k": 1024,
     "backend": "cuBLAS / cuBLASLt via torch.mm",
     "parameters": [
-      true
+      false
     ]
   },
   {
@@ -112,7 +111,7 @@
     "k": 1024,
     "backend": "cuBLAS / cuBLASLt via torch.mm",
     "parameters": [
-      true
+      false
     ]
   },
   {
@@ -155,8 +154,7 @@
     "k": 8192,
     "backend": "native DeepGEMM SM90 with tuned scheduling",
     "parameters": [
-      128,
-      1
+      128
     ]
   },
   {
@@ -248,8 +246,7 @@
     "k": 4096,
     "backend": "native DeepGEMM SM90 with tuned scheduling",
     "parameters": [
-      132,
-      64
+      132
     ]
   },
   {

@@ -37,6 +37,8 @@ def main():
               (9, 'router', 'outliers')]
     if args.full:
         cases += [(512, 'qkv_gate', 'outliers'), (1000, 'unpooler', 'outliers')]
+    cases += [(m, "pooler", "normal") for m in [2, 3, 4, 5, 6, 9, 15, 17, 31, 33, 129]]
+    cases += [(m, "unpooler", "normal") for m in [9, 15, 17, 31]]
     results = []
     for index, (m, layer, dist) in enumerate(cases):
         data = reference.generate_input(m, layer, 7100 + index, dist)
@@ -81,8 +83,34 @@ def main():
         data['x'] = columns[:0]
         out = mod.kernel_fn(data, state)
         assert out.shape == (0, data['config']['n'])
+    # Exercise every native-selected shape with views that fail its layout
+    # contract, including contiguous tensors with an unaligned base pointer.
+    layout_checks = 0
+    for (layer, m, n, k), tactic in mod._TACTICS.items():
+        if tactic[0] not in ("deep", "deepcfg", "sglang"):
+            continue
+        for layout in ["padded_rows", "offset_base"]:
+            data = reference.generate_input(m, layer, 14100 + m)
+            if layout == "padded_rows":
+                backing = torch.empty((m, k + 1), device="cuda", dtype=torch.bfloat16)
+                view = backing[:, :k]
+            else:
+                backing = torch.empty(m * k + 1, device="cuda", dtype=torch.bfloat16)
+                view = backing[1:].view(m, k)
+            view.copy_(data["x"])
+            data["x"] = view
+            mod.kernel_fn(data, state)
+            graph = torch.cuda.CUDAGraph()
+            with torch.cuda.graph(graph):
+                out = mod.kernel_fn(data, state)
+            fresh = reference.generate_input(m, layer, 15100 + m)
+            view.copy_(fresh["x"])
+            graph.replay()
+            ok, message = reference.check_implementation(data, out, weights)
+            assert ok, (layer, m, layout, message)
+            layout_checks += 1
     summary = dict(device=torch.cuda.get_device_name(), torch=torch.__version__,
-                   candidate=args.module, passed=True, checks=results,
+                   candidate=args.module, passed=True, checks=results, native_layout_checks=layout_checks,
                    additional=['row-strided activations', 'column-strided activations',
                                'all-zero inputs', 'empty batches'])
     if args.output:

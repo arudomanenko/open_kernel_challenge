@@ -46,3 +46,48 @@ Nsight Compute was attempted locally but returned `ERR_NVGPUCTRPERM`; performanc
 3. A safe single-launch split-K final reduction could remove a launch for the router and sliced unpooler. This is a proposed experiment, not an observed improvement; global spin synchronization is not acceptable.
 4. Further lossless packing would need efficient vectorized unpacking and a cheaper escape strategy. The measured implementation is a negative result, so do not deploy it merely because its byte count is smaller.
 5. Rerun close dispatch decisions on a controlled H200. Differences of one or two percent are inside or near the uncertainty interval; ranking them by one preparation timing is unreliable.
+
+
+## Review follow-up: v16–v18
+
+The initial implementation and reports were committed and pushed first as
+`4a6bcd4` on `codex/muse-bf16-proj`, as requested.
+
+- **v16 — scoped native backend:** Save and restore DeepGEMM SM-count and
+  deterministic settings around each launch in a `finally` block. Serialize
+  configuration and launch among this module's callers. Remove block-size
+  mutation because the pinned public interface has no matching getter. Guard
+  native dispatch with dense-layout and 16-byte pointer-alignment checks.
+  Remove the output-projection transpose, reducing retained storage by 16 MiB.
+  H200 check `25c2d00e3c2e4228` passed all 39 official cases at 1.21898×,
+  statistically indistinguishable from the previous 1.22024× scored result.
+- **v17 — native layout and neighborhood audit:** Development-only synthetic
+  checks in preparation exercised every native-selected shape with dense,
+  padded-row and offset-base inputs; all 21 graph-replay checks passed, with
+  DeepGEMM configuration restored after preparation and calls. Diagnostic
+  cold-cache CUDA-graph timing compared nearby shapes. It showed small pooler
+  gains for packed M=4/7 and native M=15/17, but large native regressions at
+  M=33/129. The latter routes were rejected. Qkv and sliced-unpooler gains were
+  too small to justify extending their specialized ranges. See
+  [nearby_v17.json](nearby_v17.json) for raw diagnostic times, which include
+  different event overhead from the official benchmark. The audit job
+  `2cd2938cbe074b01` also passed all official cases at 1.21798×.
+- **v18 — final bounded dispatch:** Extend pooler packed execution to M=2–8,
+  native execution to M=9–32, and unpooler transposed-library execution to
+  M=9–32. Preserve exact scored selections. Retain the generic library fallback
+  beyond these ranges. The cleaned production source has no diagnostic timing
+  or audit code. See the current [final report](final_report.md) for the final
+  official result.
+
+Four host-side regression tests cover settings restoration after success and
+failure, serialization of concurrent calls, and native-layout fallback. Expanded
+local validation passes 104 fresh-input CUDA-graph checks over 52 cases plus 14
+native-selected layout checks. The local GPU cannot exercise DeepGEMM itself;
+the v17 H200 audit supplies that separate evidence.
+
+The lock only coordinates callers using this module. Unrelated DeepGEMM users
+that mutate shared configuration concurrently still require application-level
+coordination. No claim of a new aggregate speed improvement follows from these
+changes: demonstrated benefits are lower memory, settings restoration, layout
+handling and bounded nearby-shape dispatch. Direct TMA/WGMMA scheduler development
+and single-launch split-K remain future experiments.
